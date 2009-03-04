@@ -1,0 +1,82 @@
+\" $Id: mwcollectd.1 273 2006-01-07 15:44:24Z oxff $
+\" Written while listening to Ziggy X - Geschwindigkeitsrausch
+.TH MWCOLLECTD "1" "2005-06-12" "mwcollect v3.0"
+.SH NAME
+mwcollectd \- catch autonomous spreading malware
+.SH SYNOPSIS
+\fBmwcollectd\fR [\fB--version\fR | \fB--help\fR | [\fB--console-log\fR[=tagpattern]]
+           [\fB--daemon\fR] [\fB--pid-file\fR[=\fIpidfile\fR]] [\fB--user\fR=\fIusername\fR]
+           [\fB--chroot\fR=\fIdir\fR] [\fB--config\fR=\fIconfigfile\fR] 
+           [\fB--load-url\fR=\fIurl\fR] [\fB--parse-shellcode\fR=\fIfile\fR] |
+           [\fB--donators\fR]
+.SH DESCRIPTION
+\fBmwcollectd\fR is a daemon catching autonomous spreading malware in non-native
+environments by simulating vulnerable network services and acting upon
+exploitation attempts. It allows you to configure and emulate certain
+vulnerabilities in a live network or to replay tcpdump sniffing sessions.
+.SH OPTIONS
+.TP
+\fB--console-log\fR[=\fItagpattern\fR], \fB-C\fR [\fItagpattern\fR]
+Enable logging to the console (incompatible with \fB--daemon\fR switch).
+The optional parameter \fItagpattern\fR is a mwcollect logging tag pattern that
+specifies a filter which messages to be printed to console and which messages
+to silently drop. The format for \fItagpattern\fR is the same as in the
+configuration file. If \fItagpattern\fR is ommited, mwcollectd defaults to the
+pattern "all".
+.TP
+\fB--daemon\fR, \fB-D\fR
+mwcollectd immediately goes into the background after starting.
+.TP
+\fB--pid-file\fR[=\fIpidfile\fR], \fB-P\fR [\fIpidfile\fR]
+This options instructs mwcollect to write a file with the PID of mwcollectd to
+after going into background. If left out, \fIpidfile\fR defaults to
+\fI/var/run/mwcollectd.pid\fR.
+.TP
+\fB--user\fR=\fIusername\fR
+If this option is specified, mwcollectd drops its uid to the uid of \fIusername\fR
+right after starting all modules (and therefore right after binding all ports).
+This requires mwcollectd to be initially started with root privileges.
+.TP
+\fB--capabilities\fR
+This command line switch only works on Linux machines with the capabilities
+feature compiled into the kernel. This instructs mwcollect to retain the ability
+to bind to ports lower than :1025 even after dropping root privilegues. Using
+this command line switch without the --user command line switch is effectless.
+You can find advanced documentation under http://www.mwcollect.org/wiki/Capabilities !
+.TP
+\fB--chroot\fR=\fIdir\fR
+Chroot to directory \fIdir\fR right after loading all modules but before starting
+them. Paths to the module binaries must be as if no chrooting is performed.
+Other paths configured in the modules (e.g. local filesystem malware storage paths)
+must be inside and relative to \fIdir\fR. This requires mwcollectd to be
+initially started with root privileges.
+.TP
+\fB--config\fR=\fIconfigfile\fR, \fB-c\fR \fIconfigfile\fR
+Allows you to specifiy a configuration file with \fIconfigfile\fR.
+.TP
+\fB--load-url\fR=\fIurl\fR, \fB-U\fR \fIurl\fR
+Specify an URL and mwcollectd will directly download \fIurl\fR after startup.
+.TP
+\fB--parse-shellcode\fR=\fIfile\fR
+Parse a shellcode directly upon startup and take appropriate actions. The shellcode
+is given in binary form in \fIfile\fR.
+.TP
+\fB--version\fR, \fB-v\fR
+Display mwcollect version and exit.
+.TP
+\fB--help\fR, \fB-h\fR
+Display a short parameter summary and exit.
+.TP
+\fB--donators\fR
+Lists people that donated money to the mwcollect project via the mwcollect webpage.
+.SH SECURITY CONSIDERATIONS
+Due to the very complex internal structure of mwcollectd, this software is prone
+to denial of service attacks and even remote code execution vulnerabilites.
+Therefore using the \fB--user\fR and \fB--chroot\fR switches is encouraged.
+Running in foreground mode (ommiting the \fB--daemon\fR switch) should be only
+done to debug the configuration.
+.SH FILES
+/etc/mwcollectd.conf \- mwcollectd configuration file
+.SH COPYING
+\fBmwcollectd\fR v3.x is (c) 2005 by the Honeynet Project, published under the GPL
+license. mwcollect is mainly developed by Georg Wicherski.
