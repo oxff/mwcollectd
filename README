@@ -1,0 +1,25 @@
+				    _ _           _      _ 
+	 _ __ _____      _____ ___ | | | ___  ___| |_ __| |
+	| '_ ` _ \ \ /\ / / __/ _ \| | |/ _ \/ __| __/ _` |
+	| | | | | \ V  V / (_| (_) | | |  __/ (__| || (_| |
+	|_| |_| |_|\_/\_/ \___\___/|_|_|\___|\___|\__\__,_|
+
+		v4.0.0, 2009-05-01
+
+
+mwcollectd is a versatile malware collection daemon for POSIX environments
+licensed under the LGPL v3 (see LICENSE file). The reason for choosing the
+LGPL instead of the GPL is to allow for proprietary modules to be linked into
+the daemon.
+
+This program implements ideas by Markus Koetter (esp. from Nepenthes and
+evtest) and Tillmann Werner (honeytrap). The main maintainer is Georg Wicherski
+<gw@mwcollect.org>.
+
+
+== Chanegelog ==
+
+-- v4.0.0 --
+
+  + Rewrite from the scratch, nothing much common with its successors anymore.
+
