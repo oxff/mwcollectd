@@ -1,18 +1,28 @@
 /*
- *   __              __                                               __
- *  /\ \            /\ \__                                           /\ \
- *  \ \ \____    ___\ \ ,_\   ____    ___     ___     ___   _____    \_\ \
- *   \ \ '__`\  / __`\ \ \/  /',__\ /' _ `\  / __`\  / __`\/\ '__`\  /'_` \
- *    \ \ \L\ \/\ \L\ \ \ \_/\__, `\/\ \/\ \/\ \L\ \/\ \L\ \ \ \L\ \/\ \L\ \
- *     \ \_,__/\ \____/\ \__\/\____/\ \_\ \_\ \____/\ \____/\ \ ,__/\ \___,_\
- *      \/___/  \/___/  \/__/\/___/  \/_/\/_/\/___/  \/___/  \ \ \/  \/__,_ /
- *                                                            \ \_\
- *                                                             \/_/
+ *				    _ _           _      _ 
+ *	 _ __ _____      _____ ___ | | | ___  ___| |_ __| |
+ *	| '_ ` _ \ \ /\ / / __/ _ \| | |/ _ \/ __| __/ _` |
+ *	| | | | | \ V  V / (_| (_) | | |  __/ (__| || (_| |
+ *	|_| |_| |_|\_/\_/ \___\___/|_|_|\___|\___|\__\__,_|
  *
- * interface-irc.hpp - control botsnoopd like an irc bot
  *
- * This work is (c) 2007 by Georg Wicherski, intellectual property of its
- * respective author and published under the terms given in the README file.
+ * 	Copyright 2009 Georg Wicherski, Kaspersky Labs GmbH
+ *
+ *
+ *	This file is part of mwcollectd.
+ *
+ *	mwcollectd is free software: you can redistribute it and/or modify
+ *	it under the terms of the GNU Lesser General Public License as published by
+ *	the Free Software Foundation, either version 3 of the License, or
+ *	(at your option) any later version.
+ *
+ *	mwcollectd is distributed in the hope that it will be useful,
+ *	but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *	GNU Lesser General Public License for more details.
+ *
+ *	You should have received a copy of the GNU Lesser General Public License
+ *	along with mwcollectd. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -414,10 +424,6 @@ void IrcConnection::parseCommand(string& from, string& to, vector<string>& words
 			m_daemon->getVersion() + "\r\n";
 		m_socket->send(line.data(), line.size());
 	}
-	else if(words[0] == ".dns")
-	{
-		m_daemon->getNameResolvingFacility()->resolveName(words[1], this);
-	}
 	else if(words[0] == ".list-modules")
 	{
 		string lines;
@@ -440,27 +446,6 @@ void IrcConnection::parseCommand(string& from, string& to, vector<string>& words
 		}
 
 		m_socket->send(lines.data(), lines.size());
-	}
-	else if(words[0] == ".list-loggers")
-	{
-		string line;
-
-		list<LogFacility *> loggers = m_daemon->getLogManager()
-			->getLogFacilities();
-
-		if(loggers.empty())
-			line = "PRIVMSG " + responseDestination + " :No registered log "
-				"facilities.\r\n";
-
-		for(list<LogFacility *>::iterator i = loggers.begin();
-			i != loggers.end(); ++i)
-		{
-			line += "PRIVMSG " + responseDestination + " :\x02" +
-				(* i)->getName() + "\x02 - " + (* i)->getDescription() + " => "
-				+ (* i)->getTarget() + "\r\n";
-		}
-
-		m_socket->send(line.data(), line.size());
 	}
 	else if(words[0] == ".log")
 	{
