@@ -7,10 +7,6 @@ AM_INIT_AUTOMAKE([mwcollectd], [4.0.0])
 
 AC_REVISION([1])
 
-VERSION="4.0.0"
-AC_SUBST(VERSION)
-
-
 AC_PROG_CXX
 AC_PROG_LIBTOOL
 AC_LANG_CPLUSPLUS
@@ -76,4 +72,5 @@ AC_OUTPUT([
 	Makefile
 	src/Makefile
 	src/core/Makefile
+	src/log-irc/Makefile
 	])
