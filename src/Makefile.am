@@ -4,6 +4,7 @@
 AUTOMAKE_OPTIONS = foreign
 SUBDIRS = core \
 	  log-irc \
-	  dynserv-nfqueue
+	  dynserv-nfqueue \
+	  dynserv-mirror
 
 EXTRA_DIST = README

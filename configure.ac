@@ -64,8 +64,6 @@ AC_DEFUN([CHECK_CRYPTO],
 
 CHECK_CRYPTO()
 
-
-
 AC_PROG_MAKE_SET
 
 AC_OUTPUT([
@@ -74,4 +72,5 @@ AC_OUTPUT([
 	src/core/Makefile
 	src/log-irc/Makefile
 	src/dynserv-nfqueue/Makefile
+	src/dynserv-mirror/Makefile
 	])
