@@ -73,4 +73,5 @@ AC_OUTPUT([
 	src/Makefile
 	src/core/Makefile
 	src/log-irc/Makefile
+	src/dynserv-nfqueue/Makefile
 	])
