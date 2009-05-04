@@ -3,9 +3,10 @@
 
 AUTOMAKE_OPTIONS = foreign
 
-AM_CPPFLAGS = -I../include/ -Wall -Werror -Wno-deprecated
+AM_CPPFLAGS = -DMWCOLLECTD_CORE -DCFGPREFIX=\"@prefix@\" -I../include/ -Wall -Werror -Wno-deprecated
 
 
-bin_PROGRAMS = mwcollectd
+bin_PROGRAMS  = mwcollectd
 
 mwcollectd_SOURCES  = mwcollectd.cpp
+mwcollectd_SOURCES += Daemon.cpp

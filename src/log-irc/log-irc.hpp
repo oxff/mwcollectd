@@ -64,7 +64,8 @@ public:
 	virtual const char * getDescription() { return "Control your mwcollectd "
 		"instance over a (preferably trusted) IRC network."; }
 	virtual const char * getTarget();
-	virtual void logMessage(const char * renderedMessage);
+	virtual void logMessage(LogManager::LogLevel level,
+		const char * renderedMessage);
 
 	virtual void nameResolved(string name, list<string> addresses,
 		NameResolutionStatus status);
@@ -82,7 +83,7 @@ private:
 	bool m_unloading;
 };
 
-class IrcConnection : public NetworkEndpoint, public NameResolver
+class IrcConnection : public NetworkEndpoint
 {
 public:
 	IrcConnection(Daemon * daemon, IrcInterfaceModule * parent,
@@ -97,10 +98,7 @@ public:
 
 	bool quit();
 
-	void logMessage(const char * msg);
-
-	virtual void nameResolved(string name, list<string> addresses,
-		NameResolutionStatus status);
+	void logMessage(LogManager::LogLevel level, const char * msg);
 		
 	inline void setSocket(NetworkSocket * socket) { m_socket = socket; }
 

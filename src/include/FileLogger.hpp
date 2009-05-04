@@ -44,14 +44,26 @@ public:
 			fclose(m_file);
 	}
 	
-	virtual void logMessage(const char * renderedMessage)
+	virtual void logMessage(LogManager::LogLevel lvl, const char * renderedMessage)
 	{
 		struct tm localTime;
 		time_t now = time(0);
+		static const char * levels[] = {
+			"EVENT", "SPAM", "INFO", "CRIT"
+		};
+		const char * level;
+
+		if((size_t) lvl >= sizeof(levels) / sizeof(char *))
+			level = "???";
+		else
+			level = levels[(size_t) lvl];
 
 		localtime_r(&now, &localTime);
 
-		fprintf(m_file, "[%04d-%02d-%02d %02d:%02d:%02d] %s\n", localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday,localTime.tm_hour, localTime.tm_min, localTime.tm_sec, renderedMessage);
+		fprintf(m_file, "[%04d-%02d-%02d %02d:%02d:%02d %5s] %s\n",
+			localTime.tm_year + 1900, localTime.tm_mon + 1,
+			localTime.tm_mday,localTime.tm_hour, localTime.tm_min,
+			localTime.tm_sec, level, renderedMessage);
 	}
 	
 	virtual const char * getName()

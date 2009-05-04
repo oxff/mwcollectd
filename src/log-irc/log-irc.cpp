@@ -92,7 +92,7 @@ bool IrcInterfaceModule::start(Configuration * moduleConfiguration)
 
 		if(gethostname(hostname, sizeof(hostname)) != 0)
 		{
-			LOG("Could not obtain hostname: %s!", strerror(errno));
+			LOG(L_CRIT, "Could not obtain hostname: %s!", strerror(errno));
 			return false;
 		}
 
@@ -130,10 +130,11 @@ const char * IrcInterfaceModule::getTarget()
 	return buffer;
 }
 
-void IrcInterfaceModule::logMessage(const char * renderedMessage)
+void IrcInterfaceModule::logMessage(LogManager::LogLevel level,
+	const char * renderedMessage)
 {
 	if(m_connection)
-		m_connection->logMessage(renderedMessage);
+		m_connection->logMessage(level, renderedMessage);
 }
 
 void IrcInterfaceModule::childDied(IrcConnection * conn)
@@ -170,7 +171,7 @@ void IrcInterfaceModule::nameResolved(string name, list<string> addresses,
 	if(!(socket = m_daemon->getNetworkManager()->connectStream(&remoteNode,
 		(NetworkEndpoint *) connection)))
 	{
-		LOG("Failed to connect to %s:%hu (%s:%hu) for log-irc!",
+		LOG(L_CRIT, "Failed to connect to %s:%hu (%s:%hu) for log-irc!",
 			m_remoteNode.name.c_str(), m_remoteNode.port,
 			remoteNode.name.c_str(), remoteNode.port);
 
@@ -203,6 +204,7 @@ bool IrcInterfaceModule::stop()
 }
 
 EXPORT_LIBNETWORKD_MODULE(IrcInterfaceModule, Daemon *);
+
 
 
 
@@ -259,29 +261,6 @@ void IrcConnection::connectionEstablished(NetworkNode * remoteNode,
 	m_connected = true;
 }
 
-void IrcConnection::nameResolved(string name, list<string> addresses,
-		NameResolutionStatus status)
-{
-	if(status == NRS_OK)
-	{
-		stringstream line;
-
-		line << "Resolved " << name << " to ";
-
-		for(list<string>::iterator it = addresses.begin();
-			it != addresses.end(); ++it)
-		{
-			line << * it << ", ";
-		}
-
-		LOG("%s.", line.str().substr(0, line.str().size() - 2).c_str());
-	}
-	else
-	{
-		LOG("Resolution of %s failed with code %i.", name.c_str(), status);
-	}
-}
-
 void IrcConnection::parseLine(string line)
 {
 	string::size_type pos;
@@ -296,7 +275,8 @@ void IrcConnection::parseLine(string line)
 	}
 	else if(line.substr(0, 6) == "ERROR ")
 	{
-		LOG("IRC Interface server reported error: %s", line.substr(7).c_str());
+		LOG(L_CRIT, "IRC Interface server reported error: %s",
+			line.substr(7).c_str());
 		m_socket->close();
 	}
 
@@ -464,10 +444,8 @@ void IrcConnection::parseCommand(string& from, string& to, vector<string>& words
 	}
 	else if(words[0] == ".quit")
 	{
+		LOG(L_CRIT, "Stopping mwcollectd on behalf of %s", from.c_str());
 		m_daemon->stop();
-		string line = "PRIVMSG " + responseDestination + " :Stopping mwcollectd."
-			"\r\n";
-		m_socket->send(line.data(), line.size());
 	}
 }
 
@@ -516,17 +494,22 @@ bool IrcConnection::checkCommand(string& user, string& command, string& error)
 
 void IrcConnection::connectionClosed()
 {
-	m_daemon->getNameResolvingFacility()->cancelResolutions(this);
-
 	m_parent->childDied(this);
 }
 
 
-void IrcConnection::logMessage(const char * message)
+void IrcConnection::logMessage(LogManager::LogLevel level, const char * message)
 {
+	static const char * colours[] = {
+		"\x31",
+		"\x32",
+		"\x39",
+		"\x35\x02",
+	};
+
 	if(m_connected) {
-		string line = "PRIVMSG " + m_configuration->channel + " :\x03\x35" + message
-			+ "\x03\r\n";
+		string line = "PRIVMSG " + m_configuration->channel + " :\x03" +
+			colours[level] + message + "\x03\r\n";
 		m_socket->send(line.data(), line.size());
 	}
 }

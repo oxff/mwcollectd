@@ -173,15 +173,12 @@ inline void DynamicServerNfqueue::handlePacket(struct nfq_q_handle * queue,
 			{
 				Event ev = Event("dynserv.request");
 
-				ev["address"] = address;
+				ev["address"] =
+					string(inet_ntoa(* (struct in_addr *) &address));
 				ev["port"] = port;
 				ev["protocol"] = "tcp";
 
 				m_daemon->getEventManager()->fireEvent(&ev);
-				LOG(L_INFO, "Attack from %s:%u!",
-					inet_ntoa(* (struct in_addr *)
-					&(ipHeader->saddr)),
-					ntohs(tcpHeader->source));
 			}
 			else
 			{

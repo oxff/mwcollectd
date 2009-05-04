@@ -35,10 +35,15 @@ using namespace libnetworkd;
 
 
 #ifndef MWCOLLECTD_CORE
-#define LOG(format...) m_daemon->getLogManager()->logFormatMessage(format)
+#define LOG(level, format...) m_daemon->getLogManager()->logFormatMessage(level, format)
+#define GLOG(level, format...) ::g_daemon->getLogManager()->logFormatMessage(level, format)
 #else
-#define LOG(format...) g_daemon->getLogManager()->logFormatMessage(format)
+#define LOG(level, format...) g_daemon->getLogManager()->logFormatMessage(level, format)
 #endif
+
+#define L_SPAM	LogManager::LL_SPAM
+#define L_INFO	LogManager::LL_INFO
+#define L_CRIT	LogManager::LL_CRITICAL
 
 
 #ifdef __GNUG__
@@ -73,6 +78,8 @@ public:
 	{ return &m_ModuleManager; }
 	inline EventManager * getEventManager()
 	{ return &m_EventManager; }
+	inline TimeoutManager * getTimeoutManager()
+	{ return &m_TimeoutManager; }
 
 	inline void stop()
 	{ m_active = false; }
@@ -93,8 +100,9 @@ private:
 	string m_configBasepath;
 };
 
+#ifdef MWCOLLECTD_CORE
 extern Daemon * g_daemon;
-
+#endif
 
 }
 

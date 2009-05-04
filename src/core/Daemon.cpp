@@ -97,6 +97,8 @@ bool Daemon::run(char * changeUser)
 	if(!start())
 		return false;
 
+	m_EventManager.setLogManager(&m_LogManager);
+
 	if(changeUser)
 	{
 		char * changeGroup = strchr(changeUser, ':');
@@ -162,12 +164,12 @@ bool Daemon::run(char * changeUser)
 
 			if(m_ModuleManager.unloadAll())
 			{
-				LOG("Clean shutdown complete!");
+				LOG(L_CRIT, "Clean shutdown complete!");
 				return true;
 			}
 			
-			LOG("Requested shutdown but some module could not cleanly unload, "
-				"still loaded:");
+			LOG(L_SPAM, "Requested shutdown but some module could not"
+				" cleanly unload, still loaded:");
 				
 			list<ModuleEncapsulation> modules;
 			
@@ -176,7 +178,8 @@ bool Daemon::run(char * changeUser)
 			for(list<ModuleEncapsulation>::iterator it = modules.begin();
 				it != modules.end(); ++ it)
 			{
-				LOG(" [%x] %s, %s", it->moduleId, it->moduleInterface->getName(),
+				LOG(L_SPAM, " [%x] %s, %s", it->moduleId,
+					it->moduleInterface->getName(),
 					it->moduleInterface->getDescription());
 			}
 		} while(!m_active);
@@ -198,8 +201,9 @@ bool Daemon::start()
 		// TODO FIXME: getpwnam and setrlimit HAVE_ checks
 		if(setrlimit(RLIMIT_NOFILE, &limit) < 0)
 		{
-			LOG("Could not increase maximum open fd's to %u: %s",
-				m_Configuration->getInteger(":max-fd", 10240), strerror(errno));
+			LOG(L_CRIT, "Could not increase maximum open fd's to %u: %s",
+				m_Configuration->getInteger(":max-fd", 10240),
+				strerror(errno));
 			return false;
 		}
 	}
@@ -237,17 +241,24 @@ bool Daemon::start()
 		try
 		{
 			if(config.empty())
-				m_LogManager.logFormatMessage("Loading module %s with no "
-					"configuration...", library.c_str());
+			{
+				m_LogManager.logFormatMessage(L_SPAM, "Loading module "
+					"%s with no configuration...", library.c_str());
+			}
 			else
-				m_LogManager.logFormatMessage("Loading module %s with "
-					"configuration %s...", library.c_str(), config.c_str());
+			{
+				m_LogManager.logFormatMessage(L_SPAM, "Loading module "
+					"%s with configuration %s...",
+					library.c_str(), config.c_str());
+			}
 
-			m_ModuleManager.loadModule(library.c_str(), config.c_str(), this);
+			m_ModuleManager.loadModule(library.c_str(),
+				config.c_str(), this);
 		}
 		catch(const char * error)
 		{
-			m_LogManager.logFormatMessage("Failed to load \"%s\": %s\n", library.c_str(), error);
+			m_LogManager.logFormatMessage(L_CRIT,
+				"Failed to load \"%s\": %s\n", library.c_str(), error);
 			m_ModuleManager.unloadAll();
 			return false;
 		}

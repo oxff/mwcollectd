@@ -26,7 +26,6 @@
  *
  */
 
-
 #include <mwcollectd.hpp>
 
 #include <stdio.h>
