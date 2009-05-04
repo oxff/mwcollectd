@@ -53,6 +53,9 @@ void MirrorEndpoint::connectionClosed()
 {
 	if(m_reverseSocket)
 		m_reverseSocket->close(true);
+
+	m_socket = 0;
+	closeEndpoint();
 }
 
 void MirrorEndpoint::dataRead(const char * buffer, uint32_t dataLength)
@@ -151,5 +154,6 @@ void MirrorEndpoint::closeEndpoint()
 		m_reverseSocket = 0;
 	}
 
-	m_socket->close(true);
+	if(m_socket)
+		m_socket->close(true);
 }
