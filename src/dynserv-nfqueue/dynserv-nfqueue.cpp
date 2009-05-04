@@ -169,6 +169,7 @@ inline void DynamicServerNfqueue::handlePacket(struct nfq_q_handle * queue,
 
 			if(tcpHeader->syn && !tcpHeader->ack
 				&& !tcpHeader->rst && !tcpHeader->fin
+				&& (address & 0xff) != 0x7f
 				&& monitorPort(port))
 			{
 				Event ev = Event("dynserv.request");
