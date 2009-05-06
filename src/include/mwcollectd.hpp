@@ -34,5 +34,6 @@
 
 #include "Daemon.hpp"
 #include "FileLogger.hpp"
+#include "StreamRecorder.hpp"
 
 #endif // __MWCOLLECTD_MWCOLLECTD_HPP

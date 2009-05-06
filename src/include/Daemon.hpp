@@ -26,12 +26,11 @@
  *
  */
 
-#ifndef __MWCOLLECTD_DAEMON_HPP
-#define __MWCOLLECTD_DAMEON_HPP
-
-
 #include <libnetworkd/libnetworkd.hpp>
 using namespace libnetworkd;
+
+#ifndef __MWCOLLECTD_DAEMON_HPP
+#define __MWCOLLECTD_DAEMON_HPP
 
 
 #ifndef MWCOLLECTD_CORE
@@ -52,6 +51,7 @@ using namespace libnetworkd;
 #define __COMPILER__ "unknown compiler"
 #endif
 
+
 namespace mwcollectd
 {
 
@@ -63,7 +63,7 @@ public:
 	virtual ~Daemon();
 	
 	bool run(char * changeUser = 0);
-	
+
 	static inline const char * getVersion()
 	{ return (PACKAGE_NAME " v" PACKAGE_VERSION ", compiled on [" __DATE__ " "
 		__TIME__ "] with [" __COMPILER__"]"); }

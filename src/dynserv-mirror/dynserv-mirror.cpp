@@ -44,9 +44,9 @@ bool DynamicServerMirror::start(Configuration * moduleConfiguration)
 	if(!setRanges(moduleConfiguration->getString(":mirror:port-range", "0-65535")))
 		return false;
 
-	if(!m_daemon->getEventManager()->subscribeEventMask("dynserv.request", this))
+	if(!m_daemon->getEventManager()->subscribeEventMask("stream.request", this))
 	{
-		LOG(L_CRIT, "%s could not subscribe to `dynserv.request'!", getName());
+		LOG(L_CRIT, "%s could not subscribe to `stream.request'!", getName());
 		return false;
 	}
 

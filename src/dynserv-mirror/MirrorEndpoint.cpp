@@ -31,10 +31,20 @@
 #include <sstream>
 
 
+MirrorEndpoint::~MirrorEndpoint()
+{
+	closeEndpoint();
+	
+	if(m_StreamRecorder)
+		m_StreamRecorder->release();
+}
+
 void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 	NetworkNode * localNode)
 {
 	NetworkNode remote = { remoteNode->name, localNode->port };
+
+	m_StreamRecorder = new StreamRecorder(remoteNode, localNode);
 
 	if(!(m_reverseSocket = g_daemon->getNetworkManager()->connectStream(
 		&remote, &m_reverseEndpoint)))
@@ -55,7 +65,6 @@ void MirrorEndpoint::connectionClosed()
 		m_reverseSocket->close(true);
 
 	m_socket = 0;
-	closeEndpoint();
 }
 
 void MirrorEndpoint::dataRead(const char * buffer, uint32_t dataLength)
@@ -66,20 +75,8 @@ void MirrorEndpoint::dataRead(const char * buffer, uint32_t dataLength)
 	g_daemon->getTimeoutManager()->dropTimeout(m_idleTimeout);
 	m_idleTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(15, this);
 
-	{
-		char dump[dataLength * 3 + 1];
-		register char * p = dump;
-
-		for(size_t k = 0; k < dataLength; ++k)
-		{
-			sprintf(p, "%02hx ", buffer[k] & 0xff);
-			p += 3;
-		}
-
-		* p = 0;
-
-		GLOG(L_SPAM, "DATA: %s", dump);
-	}
+	m_StreamRecorder->appendStreamData(m_StreamRecorder->DIR_INCOMING,
+		(const uint8_t *) buffer, dataLength);
 }
 
 void MirrorEndpoint::ReverseEndpoint::connectionEstablished(NetworkNode * remoteNode,
@@ -104,18 +101,8 @@ void MirrorEndpoint::ReverseEndpoint::dataRead(const char * buffer, uint32_t dat
 {
 	m_parent->m_socket->send(buffer, dataLength);
 
-	char dump[dataLength * 3 + 1];
-	register char * p = dump;
-
-	for(size_t k = 0; k < dataLength; ++k)
-	{
-		sprintf(p, "%02hx ", buffer[k] & 0xff);
-		p += 3;
-	}
-
-	* p = 0;
-
-	GLOG(L_SPAM, "RDATA: %s", dump);
+	m_parent->m_StreamRecorder->appendStreamData(m_parent->m_StreamRecorder->
+		DIR_OUTGOING, (const uint8_t *) buffer, dataLength);
 }
 
 void MirrorEndpoint::timeoutFired(Timeout timeout)
@@ -156,4 +143,12 @@ void MirrorEndpoint::closeEndpoint()
 
 	if(m_socket)
 		m_socket->close(true);
+
+	{
+		Event ev = Event("stream.finished");
+
+		ev["recorder"] = (void *) m_StreamRecorder;
+
+		g_daemon->getEventManager()->fireEvent(&ev);
+	}
 }

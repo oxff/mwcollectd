@@ -172,7 +172,7 @@ inline void DynamicServerNfqueue::handlePacket(struct nfq_q_handle * queue,
 				&& (address & 0xff) != 0x7f
 				&& monitorPort(port))
 			{
-				Event ev = Event("dynserv.request");
+				Event ev = Event("stream.request");
 
 				ev["address"] =
 					string(inet_ntoa(* (struct in_addr *) &address));

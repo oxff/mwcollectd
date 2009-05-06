@@ -26,6 +26,9 @@
  *
  */
 
+#include "Daemon.hpp"
+
+
 #ifndef __MWCOLLECTD_STREAMRECORDER_HPP
 #define __MWCOLLECTD_STREAMRECORDER_HPP
 
@@ -37,6 +40,7 @@ using namespace std;
 using namespace std::tr1;
 
 #include <pthread.h>
+#include <errno.h>
 
 
 namespace mwcollectd
@@ -46,8 +50,24 @@ namespace mwcollectd
 class StreamRecorder
 {
 public:
-	StreamRecorder(NetworkNode& source, NetworkNode& destination);
-	~StreamRecorder();
+	StreamRecorder(NetworkNode * source, NetworkNode * destination)
+	{
+		m_source = * source;
+		m_destination = * destination;
+
+		pthread_mutex_init(&m_dataMutex[0], 0);
+		pthread_mutex_init(&m_dataMutex[1], 0);
+		pthread_mutex_init(&m_propertiesMutex, 0);
+
+		m_refCount = 1;
+	}
+
+	~StreamRecorder()
+	{
+		pthread_mutex_destroy(&m_dataMutex[0]);
+		pthread_mutex_destroy(&m_dataMutex[1]);
+		pthread_mutex_destroy(&m_propertiesMutex);
+	}
 
 	enum Direction
 	{
@@ -55,13 +75,77 @@ public:
 		DIR_OUTGOING = 1
 	};
 
-	void appendStreamData(Direction direction, const uint8_t * data, size_t length);
-	basic_string<uint8_t> copyStreamData(Direction direction);
 
-	void setProperty(string& property, string& value);
-	string getProperty(string& propert);
-	vector<pair<string, string> > getProperties();
-	bool hasProperty(string& property);
+	void appendStreamData(Direction direction, const uint8_t * data, size_t length)
+	{
+		if(pthread_mutex_trylock(&m_dataMutex[direction]) != EBUSY)
+		{
+			if(!m_buffer[direction].empty())
+			{
+				m_data[direction].append(m_buffer[direction]);
+				m_buffer[direction].clear();
+			}
+
+			m_data[direction].append(data, length);
+			pthread_mutex_unlock(&m_dataMutex[direction]);
+		}
+		else
+			m_buffer[direction].append(data, length);
+	}
+
+	basic_string<uint8_t> copyStreamData(Direction direction)
+	{
+		pthread_mutex_lock(&m_dataMutex[direction]);
+
+		if(!m_buffer[direction].empty())
+		{
+			m_data[direction].append(m_buffer[direction]);
+			m_buffer[direction].clear();
+		}
+
+		basic_string<uint8_t> result = m_data[direction];
+		pthread_mutex_unlock(&m_dataMutex[direction]);
+		return result;
+	}
+
+	inline void setProperty(string& property, string& value)
+	{
+		pthread_mutex_lock(&m_propertiesMutex);
+		m_properties[property] = value;
+		pthread_mutex_unlock(&m_propertiesMutex);
+	}
+
+	inline string getProperty(string& property)
+	{
+		pthread_mutex_lock(&m_propertiesMutex);
+		string result = m_properties[property];
+		pthread_mutex_unlock(&m_propertiesMutex);
+		return result;
+	}
+
+	inline vector<pair<string, string> > getProperties()
+	{
+		vector<pair<string, string> > result;
+
+		pthread_mutex_lock(&m_propertiesMutex);
+
+		for(PropertyMap::iterator it = m_properties.begin();
+			it != m_properties.end(); ++it)
+		{
+			result.push_back(* it);
+		}
+
+		pthread_mutex_unlock(&m_propertiesMutex);
+		return result;
+	}
+
+	inline bool hasProperty(string& property)
+	{
+		pthread_mutex_lock(&m_propertiesMutex);
+		register bool result = m_properties.find(property) != m_properties.end();
+		pthread_mutex_unlock(&m_propertiesMutex);
+		return result;
+	}
 
 	inline NetworkNode getSource()
 	{ return m_source; }
@@ -70,7 +154,14 @@ public:
 
 	inline void acquire()
 	{ ++m_refCount; }
-	void release();
+
+	inline void release()
+	{
+		-- m_refCount;
+
+		if(!m_refCount)
+			delete this;
+	}
 
 private:
 	NetworkNode m_source, m_destination;

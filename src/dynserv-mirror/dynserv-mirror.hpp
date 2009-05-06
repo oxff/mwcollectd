@@ -49,10 +49,9 @@ class MirrorEndpoint : public NetworkEndpoint, public TimeoutReceiver
 public:
 	MirrorEndpoint(NetworkSocket * socket)
 		: m_reverseEndpoint(this)
-	{ m_socket = socket; }
+	{ m_socket = socket; m_StreamRecorder = 0; }
 
-	virtual ~MirrorEndpoint()
-	{ closeEndpoint(); }
+	virtual ~MirrorEndpoint();
 
 	virtual void connectionEstablished(NetworkNode * remoteNode,
 		NetworkNode * localNode);
@@ -82,6 +81,7 @@ private:
 	NetworkSocket * m_socket, * m_reverseSocket;
 
 	Timeout m_idleTimeout, m_reverseTimeout, m_retardTimeout;
+	StreamRecorder * m_StreamRecorder;
 };
 
 
