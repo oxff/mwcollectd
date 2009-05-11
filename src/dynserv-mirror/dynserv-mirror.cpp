@@ -167,7 +167,7 @@ void DynamicServerMirror::handleEvent(Event * event)
 
 	uint16_t port = (* event)["port"].getIntegerValue();
 
-	if(m_servers.find(port) != m_servers.end())
+	if(m_servers.find(Server(* (* event)["address"], port)) != m_servers.end())
 		return;
 
 	if(!mirrorPort(port))
@@ -185,7 +185,7 @@ void DynamicServerMirror::handleEvent(Event * event)
 	local.name = * (* event)["address"];
 	local.port = port;
 
-	MirrorServer * server = new MirrorServer(this, port, 30);
+	MirrorServer * server = new MirrorServer(this, local.name, port, 30);
 	NetworkSocket * socket;
 
 	if(!(socket = m_daemon->getNetworkManager()->serverStream(&local, server, 4)))
@@ -195,14 +195,14 @@ void DynamicServerMirror::handleEvent(Event * event)
 	}
 	else
 	{
-		m_servers[port] = server;
+		m_servers[Server(local.name, port)] = server;
 		server->setSocket(socket);
 	}
 }
 
-void DynamicServerMirror::removeServer(uint16_t p, MirrorServer * s)
+void DynamicServerMirror::removeServer(const Server& server, MirrorServer * s)
 {
-	ServerMap::iterator it = m_servers.find(p);
+	ServerMap::iterator it = m_servers.find(server);
 
 	if(it->second == s)
 		m_servers.erase(it);

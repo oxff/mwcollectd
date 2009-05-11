@@ -90,7 +90,7 @@ class DynamicServerMirror;
 class MirrorServer : public NetworkEndpointFactory, public TimeoutReceiver
 {
 public:
-	MirrorServer(DynamicServerMirror * parent, uint16_t port, size_t timeout);
+	MirrorServer(DynamicServerMirror * parent, const string& address, uint16_t port, size_t timeout);
 
 	virtual NetworkEndpoint * createEndpoint(NetworkSocket * clientSocket);
 	virtual void destroyEndpoint(NetworkEndpoint * endpoint);
@@ -109,6 +109,7 @@ private:
 	size_t m_maxIdleTime;
 	Timeout m_timeout;
 	uint16_t m_port;
+	string m_address;
 
 	NetworkSocket * m_socket;
 };
@@ -133,14 +134,27 @@ protected:
 	bool setRanges(const char * range);
 	bool mirrorPort(uint16_t port);
 
-	void removeServer(uint16_t port, MirrorServer * server);
+	typedef pair<string, uint16_t> Server;
+
+	void removeServer(const Server& server, MirrorServer * s);
 
 	friend class MirrorServer;
 
 private:
 	bool addRange(uint16_t port, uint16_t length);
 
-	typedef unordered_map<uint16_t, MirrorServer *> ServerMap;
+	struct ServerHash
+	{
+		std::tr1::hash<string> stringHash;
+
+		std::size_t operator()(Server server) const
+		{
+			return stringHash.operator()(server.first) ^ (server.second << 16);
+		}
+	};
+
+
+	typedef unordered_map<Server, MirrorServer *, ServerHash> ServerMap;
 	ServerMap m_servers;
 
 	Daemon * m_daemon;

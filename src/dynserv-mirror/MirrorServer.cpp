@@ -28,18 +28,23 @@
 
 #include "dynserv-mirror.hpp"
 
-MirrorServer::MirrorServer(DynamicServerMirror * parent, uint16_t port, size_t timeout)
+MirrorServer::MirrorServer(DynamicServerMirror * parent, const string& address, uint16_t port, size_t timeout)
 {
 	m_parent = parent;
 	m_maxIdleTime = timeout;
 	m_timeout = g_daemon->getTimeoutManager()->scheduleTimeout(timeout, this);
 	m_port = port;
+	m_address = address;
 }
 
 NetworkEndpoint * MirrorServer::createEndpoint(NetworkSocket * clientSocket)
 {
 	MirrorEndpoint * endpoint = new MirrorEndpoint(clientSocket);
 	m_endpoints.push_back(endpoint);
+
+	g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
+	m_timeout = g_daemon->getTimeoutManager()->scheduleTimeout(m_maxIdleTime, this);
+
 	return endpoint;
 }
 
@@ -53,10 +58,19 @@ void MirrorServer::timeoutFired(Timeout timeout)
 {
 	ASSERT(timeout == m_timeout);
 
-	GLOG(L_SPAM, "Mirror server for :%u did not serve a connection within %u "
-		"seconds, closing.", m_port, m_maxIdleTime);
+	if(!m_endpoints.empty())
+	{
+		GLOG(L_SPAM, "Mirror server for %s:%u did not serve a connection within %u "
+			"seconds, but still has children...", m_address.c_str(), m_port, m_maxIdleTime);
 
-	m_parent->removeServer(m_port, this);
+		m_timeout = g_daemon->getTimeoutManager()->scheduleTimeout(m_maxIdleTime >> 1, this);
+		return;
+	}
+
+	GLOG(L_SPAM, "Mirror server for %s:%u did not serve a connection within %u "
+		"seconds, closing.", m_address.c_str(), m_port, m_maxIdleTime);
+
+	m_parent->removeServer(DynamicServerMirror::Server(m_address, m_port), this);
 
 	m_timeout = TIMEOUT_EMPTY;
 	closeServer();
