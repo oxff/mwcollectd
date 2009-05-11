@@ -33,8 +33,6 @@
 
 MirrorEndpoint::~MirrorEndpoint()
 {
-	closeEndpoint();
-	
 	if(m_StreamRecorder)
 		m_StreamRecorder->release();
 }
@@ -49,10 +47,10 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 	if(!(m_reverseSocket = g_daemon->getNetworkManager()->connectStream(
 		&remote, &m_reverseEndpoint)))
 	{
-		GLOG(L_INFO, "Could not reverse connection!");
+		GLOG(L_INFO, "Could not reverse connection.");
 	}
 	else
-		GLOG(L_INFO, "Mirror connection to %s:%hu initiating...",
+		GLOG(L_SPAM, "Mirror connection to %s:%hu initiating...",
 			remoteNode->name.c_str(), localNode->port);
 
 	m_idleTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(15, this);
@@ -61,10 +59,9 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 
 void MirrorEndpoint::connectionClosed()
 {
-	if(m_reverseSocket)
-		m_reverseSocket->close(true);
-
 	m_socket = 0;
+
+	closeEndpoint();
 }
 
 void MirrorEndpoint::dataRead(const char * buffer, uint32_t dataLength)
@@ -89,12 +86,21 @@ void MirrorEndpoint::ReverseEndpoint::connectionEstablished(NetworkNode * remote
 void MirrorEndpoint::ReverseEndpoint::connectionClosed()
 {
 	m_parent->m_reverseSocket = 0;
-	g_daemon->getTimeoutManager()->dropTimeout(m_parent->m_reverseTimeout);
-	m_parent->m_reverseTimeout = TIMEOUT_EMPTY;
 	
-	m_parent->m_socket->send("\r\n", 2);
-	m_parent->m_retardTimeout = g_daemon->getTimeoutManager()
-		->scheduleTimeout(3, m_parent);
+	if(m_parent->m_reverseTimeout != TIMEOUT_EMPTY)
+	{
+		g_daemon->getTimeoutManager()->dropTimeout(m_parent->m_reverseTimeout);
+		m_parent->m_reverseTimeout = TIMEOUT_EMPTY;
+	}
+
+	if(m_parent->m_socket)
+	{
+		m_parent->m_socket->send("\r\n", 2);
+		m_parent->m_retardTimeout = g_daemon->getTimeoutManager()
+			->scheduleTimeout(3, m_parent);
+	}
+
+	GLOG(L_SPAM, "Reverse connection closed, falling back to retard mode...");
 }
 
 void MirrorEndpoint::ReverseEndpoint::dataRead(const char * buffer, uint32_t dataLength)
@@ -133,16 +139,14 @@ void MirrorEndpoint::timeoutFired(Timeout timeout)
 
 void MirrorEndpoint::closeEndpoint()
 {
-	g_daemon->getTimeoutManager()->dropReceiver(this);
-
 	if(m_reverseSocket)
 	{
 		m_reverseSocket->close(true);
 		m_reverseSocket = 0;
 	}
 
-	if(m_socket)
-		m_socket->close(true);
+	g_daemon->getTimeoutManager()->dropReceiver(this);
+	m_reverseTimeout = TIMEOUT_EMPTY;
 
 	{
 		Event ev = Event("stream.finished");
@@ -151,4 +155,7 @@ void MirrorEndpoint::closeEndpoint()
 
 		g_daemon->getEventManager()->fireEvent(&ev);
 	}
+
+	if(m_socket)
+		m_socket->close(true);
 }
