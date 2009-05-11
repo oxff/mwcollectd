@@ -51,7 +51,7 @@ struct IrcConfiguration
 class IrcConnection;
 
 class IrcInterfaceModule : public Module, public NameResolver, public
-	LogFacility
+	LogFacility, public EventSubscriber
 {
 public:
 	IrcInterfaceModule(Daemon * daemon);
@@ -72,13 +72,16 @@ public:
 
 	void childDied(IrcConnection * child);
 	void enableLogging(bool enable);
+	void enableDumping(bool enable);
+	
+	virtual void handleEvent(Event * event);
 
 private:
 	Daemon * m_daemon;
 	IrcConnection * m_connection;
 	IrcConfiguration m_configuration;
 	NetworkNode m_remoteNode;
-	bool m_loggingEnabled;
+	bool m_loggingEnabled, m_dumpingEnabled;
 	
 	bool m_unloading;
 };

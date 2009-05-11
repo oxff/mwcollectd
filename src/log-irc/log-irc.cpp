@@ -103,8 +103,10 @@ bool IrcInterfaceModule::start(Configuration * moduleConfiguration)
 	m_daemon->getNameResolvingFacility()->resolveName(m_remoteNode.name, this);
 
 	m_loggingEnabled = false;
-	enableLogging(moduleConfiguration->getString(":startup-logging", "")
-		== string("on"));
+	enableLogging(moduleConfiguration->getString(":startup-logging", "") == string("on"));
+
+	m_dumpingEnabled = false;
+	enableDumping(moduleConfiguration->getString(":startup-dumping", "") == string("on"));
 
 	return true;
 }
@@ -117,6 +119,16 @@ void IrcInterfaceModule::enableLogging(bool enable)
 		m_daemon->getLogManager()->removeLogFacility(this);
 
 	m_loggingEnabled = enable;
+}
+
+void IrcInterfaceModule::enableDumping(bool enable)
+{
+	if(enable && !m_dumpingEnabled)
+		m_daemon->getEventManager()->subscribeEventMask("stream.finished", this);
+	else if(!enable && m_loggingEnabled)
+		m_daemon->getEventManager()->unsubscribeEventMask("stream.finished", this);
+
+	m_dumpingEnabled = enable;
 }
 
 const char * IrcInterfaceModule::getTarget()
@@ -135,6 +147,53 @@ void IrcInterfaceModule::logMessage(LogManager::LogLevel level,
 {
 	if(m_connection)
 		m_connection->logMessage(level, renderedMessage);
+}
+
+void IrcInterfaceModule::handleEvent(Event * event)
+{
+	if(!m_connection)
+		return;
+
+	if(event->getName() == "stream.finished")
+	{
+		StreamRecorder * recorder = (StreamRecorder *)
+			(* event)["recorder"].getPointerValue();
+		basic_string<uint8_t> incoming =
+			recorder->copyStreamData(recorder->DIR_INCOMING);
+		char * message;
+
+		recorder->acquire();
+
+		if(asprintf(&message, "Stream from %s:%hu -> %s:%hu recorded.",
+			recorder->getSource().name.c_str(), recorder->getSource().port,
+			recorder->getDestination().name.c_str(),
+			recorder->getDestination().port) > 0)
+		{
+			m_connection->logMessage(L_INFO, message);
+			free(message);
+		}
+
+		for(basic_string<uint8_t>::iterator it = incoming.begin();
+			it != incoming.end();)
+		{
+			char dump[4 + 128 * 3];
+			char * walk = dump + 4;
+
+			strcpy(dump, " -> ");
+
+			for(size_t i = 0; i < 128 && it != incoming.end();
+				++i, ++it, walk += 3)
+			{
+				sprintf(walk, "%02x ", (uint32_t) * it);
+			}
+
+			* (-- walk) = 0;
+			
+			m_connection->logMessage(L_SPAM, dump);
+		}
+
+		recorder->release();
+	}
 }
 
 void IrcInterfaceModule::childDied(IrcConnection * conn)
@@ -437,6 +496,21 @@ void IrcConnection::parseCommand(string& from, string& to, vector<string>& words
 		{
 			m_parent->enableLogging(words[1] == "on");
 			line += string(" :Logging ") + (words[1] == "on" ? "en" : "dis") +
+				"abled.\r\n";
+		}
+
+		m_socket->send(line.data(), line.size());
+	}
+	else if(words[0] == ".dump")
+	{
+		string line = "PRIVMSG " + responseDestination;
+
+		if(words.size() < 2 || (words[1] != "on" && words[1] != "off"))
+			line += " :Usage: .dump <on|off>\r\n";
+		else
+		{
+			m_parent->enableDumping(words[1] == "on");
+			line += string(" :Dumping ") + (words[1] == "on" ? "en" : "dis") +
 				"abled.\r\n";
 		}
 
