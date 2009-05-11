@@ -60,6 +60,14 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 void MirrorEndpoint::connectionClosed()
 {
 	m_socket = 0;
+	
+	{
+		Event ev = Event("stream.finished");
+
+		ev["recorder"] = (void *) m_StreamRecorder;
+
+		g_daemon->getEventManager()->fireEvent(&ev);
+	}
 
 	closeEndpoint();
 }
@@ -120,8 +128,6 @@ void MirrorEndpoint::timeoutFired(Timeout timeout)
 	}
 	else if(timeout == m_reverseTimeout)
 	{
-		GLOG(L_INFO, "Reverse connection timed out, falling back...");
-
 		m_reverseSocket->close(true);
 		m_reverseSocket = 0;
 
@@ -147,14 +153,6 @@ void MirrorEndpoint::closeEndpoint()
 
 	g_daemon->getTimeoutManager()->dropReceiver(this);
 	m_reverseTimeout = TIMEOUT_EMPTY;
-
-	{
-		Event ev = Event("stream.finished");
-
-		ev["recorder"] = (void *) m_StreamRecorder;
-
-		g_daemon->getEventManager()->fireEvent(&ev);
-	}
 
 	if(m_socket)
 		m_socket->close(true);
