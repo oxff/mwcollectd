@@ -32,6 +32,7 @@
 #include <netinet/tcp.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 
 DynamicServerNfqueue::DynamicServerNfqueue(Daemon * daemon)
@@ -54,6 +55,9 @@ bool DynamicServerNfqueue::start(Configuration * moduleConfiguration)
 
 	if(!setRanges(moduleConfiguration->getString(":monitor:port-range", "0-65535")))
 		return false;
+
+	m_hitLimit = moduleConfiguration->getInteger(":rate-limit:hits", 0);
+	m_limitTimeout = moduleConfiguration->getInteger("rate-limit:timeout", 180);
 
 	if((m_netfilterHandle = nfq_open()) == 0)
 	{
@@ -120,6 +124,12 @@ bool DynamicServerNfqueue::stop()
 		m_netfilterHandle = 0;
 	}
 
+	if(m_rateLimitingTimeout != TIMEOUT_EMPTY)
+	{
+		m_daemon->getTimeoutManager()->dropTimeout(m_rateLimitingTimeout);
+		m_rateLimitingTimeout = TIMEOUT_EMPTY;
+	}
+
 	return true;
 }
 
@@ -169,22 +179,44 @@ inline void DynamicServerNfqueue::handlePacket(struct nfq_q_handle * queue,
 
 			if(tcpHeader->syn && !tcpHeader->ack
 				&& !tcpHeader->rst && !tcpHeader->fin
-				&& (address & 0xff) != 0x7f
-				&& monitorPort(port))
+				&& (address & 0xff) != 0x7f)
 			{
-				Event ev = Event("stream.request");
+				if(limitSource(ipHeader->saddr))
+				{
+					char daddrBuf[16];
 
-				ev["address"] =
-					string(inet_ntoa(* (struct in_addr *) &address));
-				ev["port"] = port;
-				ev["protocol"] = "tcp";
+					if(nfq_set_verdict(m_queueHandle, ntohl(header->packet_id),
+						NF_DROP, 0, 0) < 0)
+					{
+						LOG(L_CRIT, "Failed to set NFQUEUE verdict: %s", strerror(errno));
+						m_daemon->stop();
+					}
 
-				m_daemon->getEventManager()->fireEvent(&ev);
-			}
-			else
-			{
-				LOG(L_SPAM, "Ignored TCP packet %s:%u via NFQUEUE", 
-					inet_ntoa(* (struct in_addr *) &address), port);
+					strcpy(daddrBuf, inet_ntoa(* (struct in_addr *) &ipHeader->daddr));
+
+					LOG(L_SPAM, "Rate limiting SYN from %s to %s:%u.",
+						inet_ntoa(* (struct in_addr *) &ipHeader->saddr),
+						daddrBuf, ntohs(tcpHeader->dest));
+
+					return;
+				}
+
+				if(monitorPort(port))
+				{
+					Event ev = Event("stream.request");
+
+					ev["address"] =
+						string(inet_ntoa(* (struct in_addr *) &address));
+					ev["port"] = port;
+					ev["protocol"] = "tcp";
+
+					m_daemon->getEventManager()->fireEvent(&ev);
+				}
+				else
+				{
+					LOG(L_SPAM, "Ignored TCP packet %s:%u via NFQUEUE", 
+						inet_ntoa(* (struct in_addr *) &address), port);
+				}
 			}
 		}
 	}
@@ -287,10 +319,65 @@ bool DynamicServerNfqueue::monitorPort(uint16_t port)
 	PortRange range = { port, 0 };
 	PortSet::iterator it = m_ports.lower_bound(range);
 
-	if(port >= it->port && port <= it->port + it->length)
-		return true;
+	if(it == m_ports.end() || !(port >= it->port && port <= it->port + it->length))
+		return false;
+
+	return true;
+}
+
+bool DynamicServerNfqueue::limitSource(uint32_t address)
+{
+	RateLimitMap::iterator jt;
+
+	if(!m_hitLimit)
+		return false;
+
+	jt = m_RateLimitMap.find(address);
+
+	if(jt != m_RateLimitMap.end())
+	{
+		if(jt->second->hits >= m_hitLimit)
+			return true;
+
+		++jt->second->hits;
+	}
+	else
+	{
+		if(m_RateLimitQueue.empty())
+			m_rateLimitingTimeout = m_daemon->getTimeoutManager()->scheduleTimeout(m_limitTimeout, this);
+
+		RateLimit rl;
+
+		rl.hits = 1;
+		rl.firstTimestamp = time(0);
+
+		RateLimitQueue::iterator queueIterator = m_RateLimitQueue.insert(m_RateLimitQueue.end(), rl);
+		RateLimitMap::iterator mapIterator = m_RateLimitMap.insert(RateLimitMap::value_type(address, queueIterator)).first;
+
+		queueIterator->mapEntry = mapIterator;
+	}
 
 	return false;
+}
+
+void DynamicServerNfqueue::timeoutFired(Timeout timeout)
+{
+	time_t now = time(0);
+	ASSERT(timeout == m_rateLimitingTimeout);
+	RateLimitQueue::iterator it;
+
+	for(it = m_RateLimitQueue.begin(); it != m_RateLimitQueue.end() && it->firstTimestamp + m_limitTimeout < now; ++it)
+		m_RateLimitMap.erase(it->mapEntry);
+
+	m_RateLimitQueue.erase(m_RateLimitQueue.begin(), it);
+
+	if(!m_RateLimitQueue.empty())
+	{
+		m_rateLimitingTimeout = m_daemon->getTimeoutManager()->scheduleTimeout(m_limitTimeout - (now -
+			m_RateLimitQueue.front().firstTimestamp), this);
+	}
+	else
+		m_rateLimitingTimeout = TIMEOUT_EMPTY;
 }
 
 

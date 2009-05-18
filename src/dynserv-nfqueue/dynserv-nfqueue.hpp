@@ -33,14 +33,21 @@
 #include <mwcollectd.hpp>
 using namespace mwcollectd;
 
-#include <linux/netfilter.h>
-#include <libnetfilter_queue/libnetfilter_queue.h>
+extern "C" {
+	#include <linux/netfilter.h>
+	#include <libnetfilter_queue/libnetfilter_queue.h>
+}
 
+#include <list>
 #include <set>
+#include <tr1/unordered_map>
 using namespace std;
+using namespace std::tr1;
+
+#include <time.h>
 
 
-class DynamicServerNfqueue : public Module, public IOSocket
+class DynamicServerNfqueue : public Module, public IOSocket, public TimeoutReceiver
 {
 public:
 	DynamicServerNfqueue(Daemon * daemon);
@@ -57,11 +64,14 @@ public:
 	virtual void pollError() { pollRead(); }
 	virtual void pollWrite() { }
 
+	virtual void timeoutFired(Timeout timeout);
+
 	void handlePacket(struct nfq_q_handle * queue, struct nfgenmsg *
 		message, struct nfq_data * data);
 
 protected:
 	bool setRanges(const char * range);
+	bool limitSource(uint32_t address);
 	bool monitorPort(uint16_t port);
 
 private:
@@ -83,6 +93,23 @@ private:
 
 	typedef set<PortRange, PortRange> PortSet;
 	PortSet m_ports;
+
+	struct RateLimit
+	{
+		size_t hits;
+		time_t firstTimestamp;
+
+		unordered_map<uint32_t, list<RateLimit>::iterator>::iterator mapEntry;
+	};
+
+	typedef list<RateLimit> RateLimitQueue;
+	typedef unordered_map<uint32_t, RateLimitQueue::iterator> RateLimitMap;
+
+	RateLimitQueue m_RateLimitQueue;
+	RateLimitMap m_RateLimitMap;
+	size_t m_hitLimit;
+	time_t m_limitTimeout;
+	Timeout m_rateLimitingTimeout;
 };
 
 
