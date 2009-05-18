@@ -125,7 +125,7 @@ void IrcInterfaceModule::enableDumping(bool enable)
 {
 	if(enable && !m_dumpingEnabled)
 		m_daemon->getEventManager()->subscribeEventMask("stream.finished", this);
-	else if(!enable && m_loggingEnabled)
+	else if(!enable && m_dumpingEnabled)
 		m_daemon->getEventManager()->unsubscribeEventMask("stream.finished", this);
 
 	m_dumpingEnabled = enable;
@@ -251,6 +251,12 @@ bool IrcInterfaceModule::stop()
 	{
 		m_daemon->getLogManager()->removeLogFacility(this);
 		m_loggingEnabled = false;
+	}
+
+	if(m_dumpingEnabled)
+	{
+		m_dumpingEnabled = false;
+		m_daemon->getEventManager()->unsubscribeEventMask("stream.finished", this);
 	}
 
 	if(m_connection)
