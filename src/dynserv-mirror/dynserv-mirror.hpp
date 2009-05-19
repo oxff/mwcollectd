@@ -91,6 +91,7 @@ class MirrorServer : public NetworkEndpointFactory, public TimeoutReceiver
 {
 public:
 	MirrorServer(DynamicServerMirror * parent, const string& address, uint16_t port, size_t timeout);
+	virtual ~MirrorServer();
 
 	virtual NetworkEndpoint * createEndpoint(NetworkSocket * clientSocket);
 	virtual void destroyEndpoint(NetworkEndpoint * endpoint);

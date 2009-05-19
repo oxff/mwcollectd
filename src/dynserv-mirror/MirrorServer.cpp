@@ -37,6 +37,12 @@ MirrorServer::MirrorServer(DynamicServerMirror * parent, const string& address, 
 	m_address = address;
 }
 
+MirrorServer::~MirrorServer()
+{
+	if(m_timeout != TIMEOUT_EMPTY)
+		g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
+}
+
 NetworkEndpoint * MirrorServer::createEndpoint(NetworkSocket * clientSocket)
 {
 	MirrorEndpoint * endpoint = new MirrorEndpoint(clientSocket);
