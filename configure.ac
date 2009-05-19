@@ -273,4 +273,5 @@ AC_OUTPUT([
 	src/log-irc/Makefile
 	src/dynserv-nfqueue/Makefile
 	src/dynserv-mirror/Makefile
+	src/filestore-streams/Makefile
 	])
