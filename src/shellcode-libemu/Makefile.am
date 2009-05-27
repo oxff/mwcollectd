@@ -9,5 +9,5 @@ AM_LDFLAGS =
 pkglib_LTLIBRARIES = shellcode-libemu.la
 
 shellcode_libemu_la_SOURCES = shellcode-libemu.cpp
-shellcode_libemu_la_CXXFLAGS = $(LIBEMU_CXXFLAGS)
+shellcode_libemu_la_CPPFLAGS = $(LIBEMU_CPPFLAGS)
 shellcode_libemu_la_LDFLAGS = -module -no-undefined -avoid-version $(LIBEMU_LDFLAGS)
