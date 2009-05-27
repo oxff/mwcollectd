@@ -179,7 +179,8 @@ inline void DynamicServerNfqueue::handlePacket(struct nfq_q_handle * queue,
 
 			if(tcpHeader->syn && !tcpHeader->ack
 				&& !tcpHeader->rst && !tcpHeader->fin
-				&& (address & 0xff) != 0x7f)
+				&& (address & 0xff) != 0x7f
+				&& address != ipHeader->saddr)
 			{
 				if(limitSource(ipHeader->saddr))
 				{
