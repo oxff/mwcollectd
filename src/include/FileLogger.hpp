@@ -63,7 +63,7 @@ public:
 		if(m_file == stdout)
 		{
 			static const char * colors[] = {
-				"33", "36", "32", "31;1"
+				"36", "32", "33;1", "31;1"
 			};
 
 			fprintf(m_file, "[%04d-%02d-%02d %02d:%02d:%02d %5s] \033[%sm%s\033[0m\n",
