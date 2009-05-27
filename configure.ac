@@ -12,6 +12,8 @@ AC_PROG_LIBTOOL
 AC_LANG_CPLUSPLUS
 
 
+AC_CHECK_HEADERS([stdint.h stdlib.h string.h strings.h unistd.h])
+
 
 dnl **************************************************
 dnl * libnetworkd Support                            *
@@ -31,36 +33,113 @@ fi
 
 
 dnl **************************************************
+dnl * libemu Support                           	     *
+dnl **************************************************
+
+AC_SUBST([LIBEMU_CPPFLAGS])
+AC_SUBST([LIBEMU_LDFLAGS])
+
+AC_ARG_WITH(libemu,
+    [  --with-libemu=PATH	specify path to libemu],
+    [export PKG_CONFIG_PATH=$withval/lib/pkgconfig],
+    [])
+
+do_enable_libemu="yes"
+
+AC_ARG_ENABLE(libemu, [  --enable-libemu    enable libemu support [[default yes]]], [do_enable_libemu=$enableval])
+
+enable_libemu=${do_enable_libemu}
+
+if test x"$enable_libemu" = "xyes"; then
+	if pkg-config --exists libemu; then
+		ORIG_LDFLAGS=${LDFLAGS}
+		ORIG_CPPFLAGS=${CPPFLAGS}
+		LIBEMU_LDFLAGS=" `pkg-config --libs libemu`"
+		LIBEMU_CPPFLAGS=" `pkg-config --cflags libemu`"
+		LDFLAGS+=${LIBEMU_LDFLAGS}
+		CPPFLAGS+=${LIBEMU_CPPFLAGS}
+
+		AC_CHECK_HEADER([emu/emu.h],[enable_libemu="yes"],[enable_libemu=""])
+
+		if test x"$enable_libemu" = "xyes"; then
+			AC_CHECK_LIB([emu],[emu_new],[enable_libemu="yes"],[enable_libemu=""])
+		fi
+
+		LDFLAGS=${ORIG_LDFLAGS}
+		CPPFLAGS=${ORIG_CPPFLAGS}
+
+		echo linking against libemu `pkg-config --modversion libemu`
+	else
+		enable_libemu=""
+	fi
+
+	if test x$enable_libemu != "xyes"; then
+		AC_MSG_ERROR([libemu not found, please give correct path or install])
+	fi
+fi
+
+
+
+dnl **************************************************
+dnl * libnfq Support                           	     *
+dnl **************************************************
+
+enable_nfq="yes"
+
+AC_ARG_ENABLE(nfq, [  --enable-nfq    enable libnetfilter_queue support (default yes)], [enable_nfq="$enableval"])
+
+if test x"$enable_nfq" = "xyes"; then
+	AC_CHECK_HEADER([libnetfilter_queue/libnetfilter_queue.h],[enable_nfq="yes"],[enable_nfq=""])
+
+	if test x"$enable_nfq" = "xyes"; then
+		AC_CHECK_LIB([netfilter_queue],[nfq_open],[enable_nfq="yes"],[enable_nfq=""])
+	fi
+fi
+
+
+
+dnl **************************************************
 dnl * openssl Support                                *
 dnl **************************************************
 AC_DEFUN([CHECK_CRYPTO],
-[AC_MSG_CHECKING(for libcrypto)
+[
+    AC_SUBST(LIBCRYPTO_CXXFLAGS)
+    AC_SUBST(LIBCRYPTO_LDFLAGS)
     
     for dir in $withval /usr/local/ssl /usr/lib/ssl /usr/ssl /usr/pkg /usr/local /usr; do
         ssldir="$dir"
         if test -f "$dir/include/openssl/sha.h"; then
             found_ssl="yes";
-            CFLAGS="$CFLAGS -I$ssldir/include/openssl -DHAVE_CRYPTO=1";
-            CXXFLAGS="$CXXFLAGS -I$ssldir/include/openssl -DHAVE_CRYPTO=1";
+            LIBCRYPTO_CXXFLAGS="$CXXFLAGS -I$ssldir/include/openssl -DHAVE_CRYPTO=1";
             break;
         fi
         if test -f "$dir/include/sha.h"; then
             found_ssl="yes";
-            CFLAGS="$CFLAGS -I$ssldir/include/ -DHAVE_CRYPTO=1";
-            CXXFLAGS="$CXXFLAGS -I$ssldir/include/ -DHAVE_CRYPTO=1";
+            LIBCRYPTO_CXXFLAGS="-I$ssldir/include/ -DHAVE_CRYPTO=1";
             break
         fi
     done
+
     if test x_$found_ssl != x_yes; then
+		AC_MSG_CHECKING(for libcrypto)
         AC_MSG_ERROR(no)
     else
-        LIBS="$LIBS -lcrypto";
-        LDFLAGS="$LDFLAGS -L$ssldir/lib";
-        HAVE_CRYPTO=yes
-        AC_MSG_RESULT(yes)
+        LIBCRYPTO_LDFLAGS="-lcrypto -L$ssldir/lib";
+
+	    ORIG_LDFLAGS=${LDFLAGS}
+	    LDFLAGS="$LDFLAGS $LIBCRYPTO_LDFLAGS"
+	    AC_CHECK_LIB([crypto], [SHA1], [found_ssl="yes"], [found_ssl=""])
+	    LDFLAGS=${ORIG_LDFLAGS}
+
+	if test x_$found_ssl = x_yes; then
+		AC_MSG_CHECKING(for libcrypto)
+	        AC_MSG_RESULT(yes)
+	else
+		AC_MSG_CHECKING(for libcrypto)
+		AC_MSG_ERROR(no)
+	fi
     fi
-    AC_SUBST(HAVE_CRYPTO)
-])dnl
+])
 
 CHECK_CRYPTO()
 
@@ -264,6 +343,13 @@ ACX_PTHREAD( [LIBS="$PTHREAD_LIBS $LIBS"
 	      CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"],
 	     [AC_MSG_ERROR([No pthreads support found, please install])] )
 
+
+
+AM_CONDITIONAL(LIBEMU_MODULE, [test x$enable_libemu = "xyes"])
+AM_CONDITIONAL(NFQ_MODULE, [test x$enable_nfq = "xyes"])
+
+
+
 AC_PROG_MAKE_SET
 
 AC_OUTPUT([
@@ -274,4 +360,14 @@ AC_OUTPUT([
 	src/dynserv-nfqueue/Makefile
 	src/dynserv-mirror/Makefile
 	src/filestore-streams/Makefile
+	src/shellcode-libemu/Makefile
 	])
+
+
+if test x"$enable_libemu" != "xyes"; then
+	AC_MSG_WARN([libemu not enabled/found, this severely decreases functionality!])
+fi
+
+if test x"$enable_nfq" != "xyes"; then
+	AC_MSG_WARN([libnetfilter_queue not enabled/found, mirror mode not possible!])
+fi
