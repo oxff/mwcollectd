@@ -54,16 +54,30 @@ public:
 		const char * level;
 
 		if((size_t) lvl >= sizeof(levels) / sizeof(char *))
-			level = "???";
-		else
-			level = levels[(size_t) lvl];
+			return;
+		
+		level = levels[(size_t) lvl];
 
 		localtime_r(&now, &localTime);
 
-		fprintf(m_file, "[%04d-%02d-%02d %02d:%02d:%02d %5s] %s\n",
-			localTime.tm_year + 1900, localTime.tm_mon + 1,
-			localTime.tm_mday,localTime.tm_hour, localTime.tm_min,
-			localTime.tm_sec, level, renderedMessage);
+		if(m_file == stdout)
+		{
+			static const char * colors[] = {
+				"33", "36", "32", "31;1"
+			};
+
+			fprintf(m_file, "[%04d-%02d-%02d %02d:%02d:%02d %5s] \033[%sm%s\033[0m\n",
+				localTime.tm_year + 1900, localTime.tm_mon + 1,
+				localTime.tm_mday,localTime.tm_hour, localTime.tm_min,
+				localTime.tm_sec, level, colors[lvl], renderedMessage);
+		}
+		else
+		{
+			fprintf(m_file, "[%04d-%02d-%02d %02d:%02d:%02d %5s] %s\n",
+				localTime.tm_year + 1900, localTime.tm_mon + 1,
+				localTime.tm_mday,localTime.tm_hour, localTime.tm_min,
+				localTime.tm_sec, level, renderedMessage);
+		}
 	}
 	
 	virtual const char * getName()
