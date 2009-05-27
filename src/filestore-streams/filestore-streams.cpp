@@ -117,7 +117,8 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 
 bool FileStoreStreamsModule::stop()
 {
-	return m_daemon->getEventManager()->unsubscribeEventMask("stram.finished", this);
+	m_daemon->getEventManager()->unsubscribeEventMask("stram.finished", this);
+	return true;
 }
 
 EXPORT_LIBNETWORKD_MODULE(FileStoreStreamsModule, Daemon *);
