@@ -75,8 +75,9 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 
 		for(StreamRecorder::Direction k = StreamRecorder::DIR_INCOMING;; k = StreamRecorder::DIR_OUTGOING)
 		{
-			basic_string<uint8_t> incoming =
-				recorder->copyStreamData(k);
+			recorder->acquireStreamData(k);
+			const basic_string<uint8_t>& incoming =
+				recorder->getStreamData(k);
 			stringstream filename;
 
 			filename << m_directory << recorder->getSource().name << '-' << recorder->getSource().port
@@ -86,22 +87,26 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 			if((fd = open(filename.str().c_str(), O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
 			{
 				LOG(L_CRIT, "Could not open %s for storing stream: %s", filename.str().c_str(), strerror(errno));
+				recorder->releaseStreamData(k);
 				return;
 			}
 
 			int ret;
+			basic_string<uint8_t>::size_type offset = 0;
 
-			while(!incoming.empty() && (ret = write(fd, incoming.data(), incoming.size())) > 0)
-				incoming.erase(0, ret);
+			while(!incoming.empty() && (ret = write(fd, incoming.data() + offset, incoming.size() - offset)) > 0)
+				offset += ret;
 
 			if(!incoming.empty())
 			{
 				LOG(L_CRIT, "Could not write all data to %s: %s", filename.str().c_str(), strerror(errno));
 
+				recorder->releaseStreamData(k);
 				close(fd);
 				return;
 			}
 
+			recorder->releaseStreamData(k);
 			close(fd);
 
 			if(k == StreamRecorder::DIR_OUTGOING)

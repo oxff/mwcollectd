@@ -76,9 +76,10 @@ public:
 	};
 
 
+	//! IMPORTANT: There may be always only one thread writing to a StreamRecorder!
 	void appendStreamData(Direction direction, const uint8_t * data, size_t length)
 	{
-		if(pthread_mutex_trylock(&m_dataMutex[direction]) != EBUSY)
+		if(pthread_mutex_trylock(&m_dataMutex[direction]) == 0)
 		{
 			if(!m_buffer[direction].empty())
 			{
@@ -93,20 +94,24 @@ public:
 			m_buffer[direction].append(data, length);
 	}
 
-	basic_string<uint8_t> copyStreamData(Direction direction)
+
+
+	inline bool acquireStreamData(Direction direction)
 	{
-		pthread_mutex_lock(&m_dataMutex[direction]);
-
-		if(!m_buffer[direction].empty())
-		{
-			m_data[direction].append(m_buffer[direction]);
-			m_buffer[direction].clear();
-		}
-
-		basic_string<uint8_t> result = m_data[direction];
-		pthread_mutex_unlock(&m_dataMutex[direction]);
-		return result;
+		return pthread_mutex_lock(&m_dataMutex[direction]) == 0;
 	}
+
+	inline void releaseStreamData(Direction direction)
+	{
+		pthread_mutex_unlock(&m_dataMutex[direction]);
+	}
+
+	inline const basic_string<uint8_t>& getStreamData(Direction direction)
+	{
+		return m_data[direction];
+	}
+
+
 
 	inline void setProperty(string& property, string& value)
 	{
@@ -151,6 +156,10 @@ public:
 	{ return m_source; }
 	inline NetworkNode getDestination()
 	{ return m_destination; }
+
+
+
+	// TODO FIXME: these might theoretically require locking, unless we use LOCK prefix on x86
 
 	inline void acquire()
 	{ ++m_refCount; }

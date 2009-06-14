@@ -158,8 +158,9 @@ void IrcInterfaceModule::handleEvent(Event * event)
 	{
 		StreamRecorder * recorder = (StreamRecorder *)
 			(* event)["recorder"].getPointerValue();
-		basic_string<uint8_t> incoming =
-			recorder->copyStreamData(recorder->DIR_INCOMING);
+		recorder->acquireStreamData(recorder->DIR_INCOMING);
+		const basic_string<uint8_t>& incoming =
+			recorder->getStreamData(recorder->DIR_INCOMING);
 		char * message;
 
 		recorder->acquire();
@@ -173,7 +174,7 @@ void IrcInterfaceModule::handleEvent(Event * event)
 			free(message);
 		}
 
-		for(basic_string<uint8_t>::iterator it = incoming.begin();
+		for(basic_string<uint8_t>::const_iterator it = incoming.begin();
 			it != incoming.end();)
 		{
 			char dump[4 + 128 * 3];
@@ -192,6 +193,7 @@ void IrcInterfaceModule::handleEvent(Event * event)
 			m_connection->logMessage(L_SPAM, dump);
 		}
 
+		recorder->releaseStreamData(recorder->DIR_INCOMING);
 		recorder->release();
 	}
 }
