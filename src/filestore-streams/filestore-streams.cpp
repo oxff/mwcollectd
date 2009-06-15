@@ -94,10 +94,10 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 			int ret;
 			basic_string<uint8_t>::size_type offset = 0;
 
-			while(!incoming.empty() && (ret = write(fd, incoming.data() + offset, incoming.size() - offset)) > 0)
+			while(offset < incoming.size() && (ret = write(fd, incoming.data() + offset, incoming.size() - offset)) > 0)
 				offset += ret;
 
-			if(!incoming.empty())
+			if(offset < incoming.size())
 			{
 				LOG(L_CRIT, "Could not write all data to %s: %s", filename.str().c_str(), strerror(errno));
 
