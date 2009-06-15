@@ -29,6 +29,8 @@
 #include <libnetworkd/libnetworkd.hpp>
 using namespace libnetworkd;
 
+#include <list>
+
 #ifndef __MWCOLLECTD_DAEMON_HPP
 #define __MWCOLLECTD_DAEMON_HPP
 
@@ -55,6 +57,14 @@ using namespace libnetworkd;
 namespace mwcollectd
 {
 
+
+class CoreLoopable
+{
+public:
+	virtual ~CoreLoopable() { }
+
+	virtual void loop() = 0;
+};
 
 class Daemon
 {
@@ -84,6 +94,11 @@ public:
 	inline void stop()
 	{ m_active = false; }
 
+	inline void registerLoopable(CoreLoopable * p)
+	{ m_loopables.push_back(p); }
+	inline void unregisterLoopable(CoreLoopable * p)
+	{ m_loopables.remove(p); }
+
 protected:
 	bool start();
 
@@ -98,6 +113,8 @@ private:
 
 	bool m_active;	
 	string m_configBasepath;
+
+	std::list<CoreLoopable *> m_loopables;
 };
 
 #ifdef MWCOLLECTD_CORE
