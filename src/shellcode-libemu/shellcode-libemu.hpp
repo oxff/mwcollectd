@@ -30,15 +30,27 @@
 #ifndef __MWCOLLECTD_SHELLCODELIBEMU_HPP
 #define __MWCOLLECTD_SHELLCODELIBEMU_HPP
 
+
+#include <libnetworkd/libnetworkd.hpp>
+using namespace libnetworkd;
+
 #include <mwcollectd.hpp>
 using namespace mwcollectd;
 
 
-class ShellcodeLibemuModule : public Module, public EventSubscriber
+#include <list>
+using namespace std;
+
+#include <pthread.h>
+
+
+class AnalyzerThread;
+
+class ShellcodeLibemuModule : public Module, public EventSubscriber, public CoreLoopable
 {
 public:
 	ShellcodeLibemuModule(Daemon * daemon);
-	virtual ~ShellcodeLibemuModule() { }
+	virtual ~ShellcodeLibemuModule();
 
 	virtual bool start(Configuration * moduleConfiguration);
 	virtual bool stop();
@@ -49,12 +61,61 @@ public:
 
 	virtual void handleEvent(Event * event);
 
-protected:
-	virtual void checkRecorder(StreamRecorder * recorder);
+	virtual void loop();
+
+
+	struct Result
+	{
+		StreamRecorder * recorder;
+		int shellcodeOffset;
+	};
 
 private:
 	Daemon * m_daemon;
+
+	list<StreamRecorder *> m_testQueue;
+	pthread_mutex_t m_testQueueMutex;
+	pthread_cond_t m_testCond;
+
+	list<Result> m_resultQueue;
+	pthread_mutex_t m_resultQueueMutex;
+
+	vector<AnalyzerThread *> m_threads;
+
+	bool m_exiting;
 };
+
+
+class AnalyzerThread
+{
+public:
+	AnalyzerThread(list<StreamRecorder *> * queue, pthread_mutex_t * mutex,
+		pthread_cond_t * condition, list<ShellcodeLibemuModule::Result> *
+		resultQueue, pthread_mutex_t * m_resultMutex);
+
+	bool spawn();
+	void deactivate();
+	void join();
+
+protected:
+	static inline void * threadTrampoline(void * instance)
+	{ ((AnalyzerThread *) instance)->run(); return 0; }
+	void run();
+
+	int checkRecorder(StreamRecorder * recorder);
+
+private:
+	list<StreamRecorder *> * m_testQueue;
+	pthread_mutex_t * m_testQueueMutex;
+	pthread_cond_t * m_testAvailable;
+	pthread_t m_meself;
+
+	list<ShellcodeLibemuModule::Result> * m_resultQueue;
+	pthread_mutex_t * m_resultQueueMutex;
+
+	bool m_active;
+};
+
 
 
 

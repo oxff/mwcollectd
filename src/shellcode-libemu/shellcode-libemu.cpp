@@ -28,71 +28,157 @@
 
 #include "shellcode-libemu.hpp"
 
-extern "C" {
-#include <emu/emu.h>
-#include <emu/emu_log.h>
-#include <emu/emu_shellcode.h>
-#include <emu/emu_memory.h>
-#include <emu/emu_cpu.h>
-#include <emu/emu_cpu_data.h>
-#include <emu/environment/emu_env.h>
-#include <emu/environment/win32/emu_env_w32.h>
-#include <emu/environment/win32/emu_env_w32_dll.h>
-#include <emu/environment/win32/emu_env_w32_dll_export.h>
-}
-
+// TODO FIXME: autoconf check
+#include <sys/sysinfo.h>
 
 ShellcodeLibemuModule::ShellcodeLibemuModule(Daemon * daemon)
 {
 	m_daemon = daemon;
+	m_exiting = false;
+
+	pthread_mutex_init(&m_testQueueMutex, 0);
+	pthread_cond_init(&m_testCond, 0);
+	pthread_mutex_init(&m_resultQueueMutex, 0);
+}
+
+ShellcodeLibemuModule::~ShellcodeLibemuModule()
+{
+	pthread_cond_destroy(&m_testCond);
+	pthread_mutex_destroy(&m_testQueueMutex);
+	pthread_mutex_destroy(&m_resultQueueMutex);
 }
 
 bool ShellcodeLibemuModule::start(Configuration * config)
 {
+	size_t threads = 0;
+	
+	if(config)
+		threads = config->getInteger(":threads", 0);
+
+	if(!threads)
+	{
+		// TODO FIXME: add autoconf check for function
+		threads = get_nprocs();
+		LOG(L_INFO, "Creating %u shellcode testing threads.", threads);
+	}
+
+	// TODO FIXME: cap m_therads size
+
+	for(size_t k = 0; k < threads; ++k)
+	{
+		AnalyzerThread * t = new AnalyzerThread(&m_testQueue, &m_testQueueMutex,
+			&m_testCond, &m_resultQueue, &m_resultQueueMutex);
+
+		if(!t->spawn())
+			return false;
+
+		m_threads.push_back(t);
+	}
+
 	if(!m_daemon->getEventManager()->subscribeEventMask("stream.finished", this))
 		return false;
+
+	m_daemon->registerLoopable(this);
 
 	return true;
 }
 
 bool ShellcodeLibemuModule::stop()
 {
+	{
+		pthread_mutex_lock(&m_testQueueMutex);
+
+		if(!m_testQueue.empty())
+		{
+			pthread_mutex_unlock(&m_testQueueMutex);
+			LOG(L_CRIT, __PRETTY_FUNCTION__);
+
+			m_exiting = true;
+			return false;
+		}
+
+		for(vector<AnalyzerThread *>::iterator it = m_threads.begin();
+			it != m_threads.end(); ++it)
+		{
+			(* it)->deactivate();
+		}
+
+		pthread_mutex_unlock(&m_testQueueMutex);
+	}
+	
+	pthread_cond_broadcast(&m_testCond);
+
+	for(vector<AnalyzerThread *>::iterator it = m_threads.begin();
+		it != m_threads.end(); ++it)
+	{
+		(* it)->join();
+	}
+
+	m_daemon->unregisterLoopable(this);
+
 	return true;
 }
 
 void ShellcodeLibemuModule::handleEvent(Event * ev)
 {
+	if(m_exiting)
+		return;
+
 	if(ev->getName() == "stream.finished")
 	{
 		StreamRecorder * recorder = (StreamRecorder *)
 			(* ev)["recorder"].getPointerValue();
 
 		recorder->acquire();
-		checkRecorder(recorder);
-		recorder->release();
+
+		pthread_mutex_lock(&m_testQueueMutex);
+		m_testQueue.push_back(recorder);
+		pthread_mutex_unlock(&m_testQueueMutex);
+		pthread_cond_signal(&m_testCond);
 	}
 }
 
-void ShellcodeLibemuModule::checkRecorder(StreamRecorder * recorder)
+void ShellcodeLibemuModule::loop()
 {
-	struct emu * e;
-	int offset;
-	basic_string<uint8_t> data = recorder->copyStreamData(recorder->DIR_INCOMING);
+	Result result;
 
-	if(!(e = emu_new()))
+	for(;;)
 	{
-		LOG(L_CRIT, "Failed to create new libemu instance in %s!", __PRETTY_FUNCTION__);
-		return;
-	}
+		{
+			pthread_mutex_lock(&m_resultQueueMutex);
 
-	if((offset = emu_shellcode_test(e, (uint8_t *) data.data(), data.size())) >= 0)
-	{
-		LOG(L_INFO, "Found shellcode in recorder %p at offset %i!", recorder, offset);
-	}
-	else
-		LOG(L_SPAM, "No shellcode in recorder %p.", recorder);
+			if(m_resultQueue.empty())
+			{
+				pthread_mutex_unlock(&m_resultQueueMutex);
 
-	emu_free(e);
+				if(m_exiting)
+					m_daemon->stop();
+
+				return;
+			}
+
+			result = m_resultQueue.front();
+			m_resultQueue.pop_front();
+			pthread_mutex_unlock(&m_resultQueueMutex);
+		}
+
+		if(result.shellcodeOffset >= 0)
+		{
+			Event ev = Event("shellcode.detected");
+
+			ev["recorder"] = (void *) result.recorder;
+			ev["offset"] = (uint32_t) result.shellcodeOffset;
+
+			m_daemon->getEventManager()->fireEvent(&ev);
+		}
+		else
+		{
+			LOG(L_SPAM, "Stream with recorder %p did not contain shellcode.",
+				result.recorder);
+		}
+
+		result.recorder->release();
+	}
 }
 
 
