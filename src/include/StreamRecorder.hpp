@@ -42,6 +42,8 @@ using namespace std::tr1;
 #include <pthread.h>
 #include <errno.h>
 
+#include <stdio.h>
+
 
 namespace mwcollectd
 {
@@ -62,7 +64,7 @@ public:
 		m_refCount = 1;
 	}
 
-	~StreamRecorder()
+	virtual ~StreamRecorder()
 	{
 		pthread_mutex_destroy(&m_dataMutex[0]);
 		pthread_mutex_destroy(&m_dataMutex[1]);
@@ -167,9 +169,9 @@ public:
 	inline void release()
 	{
 		-- m_refCount;
-
+		
 		if(!m_refCount)
-			delete this;
+			delete this;		
 	}
 
 private:
