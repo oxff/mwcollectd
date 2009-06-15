@@ -155,6 +155,15 @@ bool Daemon::run(char * changeUser)
 			m_TimeoutManager.fireTimeouts();
 //			m_HashManager.loop();
 
+			for(std::list<CoreLoopable *>::iterator it = m_loopables.begin();
+				it != m_loopables.end(); ++it)
+			{
+				(* it)->loop();
+			}
+
+			if(timeout == (uint32_t) -1)
+				timeout = 2;
+
 			m_NetworkManager.waitForEventsAndProcess(timeout);
 		}
 
