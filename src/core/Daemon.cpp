@@ -159,6 +159,9 @@ bool Daemon::run(char * changeUser)
 				it != m_loopables.end(); ++it)
 			{
 				(* it)->loop();
+
+				if((* it)->computationPending())
+					timeout = 0;
 			}
 
 			if(timeout == (uint32_t) -1)

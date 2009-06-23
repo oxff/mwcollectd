@@ -64,6 +64,8 @@ public:
 	virtual ~CoreLoopable() { }
 
 	virtual void loop() = 0;
+	virtual bool computationPending()
+	{ return false; }
 };
 
 class Daemon
@@ -120,6 +122,7 @@ private:
 #ifdef MWCOLLECTD_CORE
 extern Daemon * g_daemon;
 #endif
+
 
 }
 

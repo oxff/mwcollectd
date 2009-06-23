@@ -115,17 +115,17 @@ public:
 
 
 
-	inline void setProperty(string& property, string& value)
+	inline void setProperty(const char * property, string value)
 	{
 		pthread_mutex_lock(&m_propertiesMutex);
-		m_properties[property] = value;
+		m_properties[string(property)] = value;
 		pthread_mutex_unlock(&m_propertiesMutex);
 	}
 
-	inline string getProperty(string& property)
+	inline string getProperty(const char * property)
 	{
 		pthread_mutex_lock(&m_propertiesMutex);
-		string result = m_properties[property];
+		string result = m_properties[string(property)];
 		pthread_mutex_unlock(&m_propertiesMutex);
 		return result;
 	}
@@ -146,7 +146,7 @@ public:
 		return result;
 	}
 
-	inline bool hasProperty(string& property)
+	inline bool hasProperty(const char * property)
 	{
 		pthread_mutex_lock(&m_propertiesMutex);
 		register bool result = m_properties.find(property) != m_properties.end();
