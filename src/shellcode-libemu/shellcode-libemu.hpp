@@ -44,6 +44,56 @@ using namespace std;
 #include <pthread.h>
 
 
+extern "C" {
+#include "emu/emu.h"
+#include "emu/emu_memory.h"
+#include "emu/emu_cpu.h"
+#include "emu/emu_log.h"
+#include "emu/emu_cpu_data.h"
+#include "emu/emu_cpu_stack.h"
+#include "emu/environment/emu_profile.h"
+#include "emu/environment/emu_env.h"
+#include "emu/environment/win32/emu_env_w32.h"
+#include "emu/environment/win32/emu_env_w32_dll.h"
+#include "emu/environment/win32/emu_env_w32_dll_export.h"
+#include "emu/environment/win32/env_w32_dll_export_kernel32_hooks.h"
+#include "emu/environment/linux/emu_env_linux.h"
+#include "emu/emu_getpc.h"
+#include "emu/emu_graph.h"
+#include "emu/emu_string.h"
+#include "emu/emu_hashtable.h"
+
+#include "emu/emu_shellcode.h"
+}
+
+#include "schooks.hpp"
+
+
+
+class EmulatorSession
+{
+public:
+	EmulatorSession(const uint8_t * data, size_t size, uint32_t startOffset,
+		Daemon * daemon);
+	~EmulatorSession();
+
+	bool step();
+
+	void addDirectDownload(const char * url, const char * localFile);
+
+protected:
+	void registerHooks();
+
+private:
+	struct emu * m_emu;
+	struct emu_env * m_env;
+	struct emu_cpu * m_cpu;
+
+	uint32_t m_steps;
+
+	Daemon * m_daemon;
+};
+
 class AnalyzerThread;
 
 class ShellcodeLibemuModule : public Module, public EventSubscriber, public CoreLoopable
@@ -62,6 +112,8 @@ public:
 	virtual void handleEvent(Event * event);
 
 	virtual void loop();
+	virtual bool computationPending()
+	{ return !m_emulators.empty(); }
 
 
 	struct Result
@@ -81,6 +133,8 @@ private:
 	pthread_mutex_t m_resultQueueMutex;
 
 	vector<AnalyzerThread *> m_threads;
+
+	list<EmulatorSession *> m_emulators;
 
 	bool m_exiting;
 };
@@ -115,8 +169,6 @@ private:
 
 	bool m_active;
 };
-
-
 
 
 #endif // __MWCOLLECTD_SHELLCODELIBEMU_HPP

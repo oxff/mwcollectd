@@ -142,6 +142,13 @@ void ShellcodeLibemuModule::loop()
 {
 	Result result;
 
+	for(list<EmulatorSession *>::iterator it = m_emulators.begin();
+		it != m_emulators.end(); ++it)
+	{
+		if(!(* it)->step())
+			it = m_emulators.erase(it);
+	}
+		
 	for(;;)
 	{
 		{
@@ -164,20 +171,37 @@ void ShellcodeLibemuModule::loop()
 
 		if(result.shellcodeOffset >= 0)
 		{
-			Event ev = Event("shellcode.detected");
+			{
+				char offsetString[10];
 
-			ev["recorder"] = (void *) result.recorder;
-			ev["offset"] = (uint32_t) result.shellcodeOffset;
+				Event ev = Event("shellcode.detected");
+				ev["recorder"] = (void *) result.recorder;
+				m_daemon->getEventManager()->fireEvent(&ev);
 
-			m_daemon->getEventManager()->fireEvent(&ev);
+				snprintf(offsetString, sizeof(offsetString) - 1, "%x",
+					result.shellcodeOffset);
+				result.recorder->setProperty("shellcode.offset", offsetString);
+			}
+
+			{
+				result.recorder->acquireStreamData(StreamRecorder::DIR_INCOMING);
+				const basic_string<uint8_t>& stream =
+					result.recorder->getStreamData(StreamRecorder::DIR_INCOMING);
+
+				EmulatorSession * emu = new EmulatorSession(stream.data(),
+					stream.size(), result.shellcodeOffset, m_daemon);
+				m_emulators.push_back(emu);
+
+				result.recorder->releaseStreamData(StreamRecorder::DIR_INCOMING);
+			}
 		}
 		else
 		{
 			LOG(L_SPAM, "Stream with recorder %p did not contain shellcode.",
 				result.recorder);
-		}
 
-		result.recorder->release();
+			result.recorder->release();
+		}
 	}
 }
 

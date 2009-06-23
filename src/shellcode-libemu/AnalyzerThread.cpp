@@ -30,19 +30,6 @@
 
 #include <signal.h>
 
-extern "C" {
-#include <emu/emu.h>
-#include <emu/emu_log.h>
-#include <emu/emu_shellcode.h>
-#include <emu/emu_memory.h>
-#include <emu/emu_cpu.h>
-#include <emu/emu_cpu_data.h>
-#include <emu/environment/emu_env.h>
-#include <emu/environment/win32/emu_env_w32.h>
-#include <emu/environment/win32/emu_env_w32_dll.h>
-#include <emu/environment/win32/emu_env_w32_dll_export.h>
-}
-
 
 
 AnalyzerThread::AnalyzerThread(list<StreamRecorder *> * queue, pthread_mutex_t * mutex,
