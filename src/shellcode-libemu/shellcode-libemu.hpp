@@ -74,7 +74,7 @@ class EmulatorSession
 {
 public:
 	EmulatorSession(const uint8_t * data, size_t size, uint32_t startOffset,
-		Daemon * daemon);
+		Daemon * daemon, StreamRecorder * recorder);
 	~EmulatorSession();
 
 	bool step();
@@ -92,6 +92,7 @@ private:
 	uint32_t m_steps;
 
 	Daemon * m_daemon;
+	StreamRecorder * m_recorder;
 };
 
 class AnalyzerThread;

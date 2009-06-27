@@ -62,7 +62,7 @@ bool ShellcodeLibemuModule::start(Configuration * config)
 		LOG(L_INFO, "Creating %u shellcode testing threads.", threads);
 	}
 
-	// TODO FIXME: cap m_therads size
+	m_threads.reserve(threads);
 
 	for(size_t k = 0; k < threads; ++k)
 	{
@@ -146,7 +146,10 @@ void ShellcodeLibemuModule::loop()
 		it != m_emulators.end(); ++it)
 	{
 		if(!(* it)->step())
+		{
+			delete * it;
 			it = m_emulators.erase(it);
+		}
 	}
 		
 	for(;;)
@@ -189,10 +192,12 @@ void ShellcodeLibemuModule::loop()
 					result.recorder->getStreamData(StreamRecorder::DIR_INCOMING);
 
 				EmulatorSession * emu = new EmulatorSession(stream.data(),
-					stream.size(), result.shellcodeOffset, m_daemon);
+					stream.size(), result.shellcodeOffset, m_daemon,
+					result.recorder);
 				m_emulators.push_back(emu);
 
 				result.recorder->releaseStreamData(StreamRecorder::DIR_INCOMING);
+				result.recorder->release();
 			}
 		}
 		else

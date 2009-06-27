@@ -40,7 +40,7 @@
 
 
 EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
-	uint32_t startOffset, Daemon * daemon)
+	uint32_t startOffset, Daemon * daemon, StreamRecorder * recorder)
 {
 	m_emu = emu_new();
 	m_env = emu_env_new(m_emu);
@@ -65,6 +65,9 @@ EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
 	emu_cpu_eip_set(m_cpu, CODE_OFFSET + startOffset);
 
 	registerHooks();
+
+	m_recorder = recorder;
+	m_recorder->acquire();
 }
 
 EmulatorSession::~EmulatorSession()
@@ -74,6 +77,9 @@ EmulatorSession::~EmulatorSession()
 
 	if(m_env)
 		emu_env_free(m_env);
+
+	if(m_recorder)
+		m_recorder->release();
 }
 
 void EmulatorSession::registerHooks()
@@ -148,8 +154,20 @@ bool EmulatorSession::step()
 
 void EmulatorSession::addDirectDownload(const char * url, const char * filename)
 {
-	LOG(L_INFO, "Shellcode downloads remote URL \"%s\" to \"%s\".",
-		url, filename);
+	LOG(L_INFO, "Shellcode in %p downloads remote URL \"%s\" to \"%s\".",
+		m_recorder, url, filename);
+
+	m_recorder->setProperty("url", url);
+	m_recorder->setProperty("localfile", filename);
+
+	{
+		Event ev = Event("download.request");
+
+		ev["url"] = url;
+		ev["recorder"] = (void *) m_recorder;
+
+		m_daemon->getEventManager()->fireEvent(&ev);
+	}
 }
 
 
