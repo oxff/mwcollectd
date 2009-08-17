@@ -51,7 +51,7 @@ struct IrcConfiguration
 class IrcConnection;
 
 class IrcInterfaceModule : public Module, public NameResolver, public
-	LogFacility, public EventSubscriber
+	LogFacility, public EventSubscriber, public TimeoutReceiver
 {
 public:
 	IrcInterfaceModule(Daemon * daemon);
@@ -76,12 +76,16 @@ public:
 	
 	virtual void handleEvent(Event * event);
 
+	virtual void timeoutFired(Timeout timeout);
+
 private:
 	Daemon * m_daemon;
 	IrcConnection * m_connection;
 	IrcConfiguration m_configuration;
 	NetworkNode m_remoteNode;
 	bool m_loggingEnabled, m_dumpingEnabled;
+
+	Timeout m_reconnectTimeout;
 	
 	bool m_unloading;
 };

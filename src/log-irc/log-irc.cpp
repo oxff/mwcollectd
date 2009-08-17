@@ -100,6 +100,7 @@ bool IrcInterfaceModule::start(Configuration * moduleConfiguration)
 			+ hostname + m_configuration.nickname.substr(pos + 1);
 	}
 
+	m_reconnectTimeout = TIMEOUT_EMPTY;
 	m_daemon->getNameResolvingFacility()->resolveName(m_remoteNode.name, this);
 
 	m_loggingEnabled = false;
@@ -148,6 +149,16 @@ void IrcInterfaceModule::logMessage(LogManager::LogLevel level,
 	if(m_connection)
 		m_connection->logMessage(level, renderedMessage);
 }
+
+void IrcInterfaceModule::timeoutFired(Timeout t)
+{
+	if(t == m_reconnectTimeout)
+	{
+		m_daemon->getNameResolvingFacility()->resolveName(m_remoteNode.name, this);
+		m_reconnectTimeout = TIMEOUT_EMPTY;
+	}
+}
+
 
 void IrcInterfaceModule::handleEvent(Event * event)
 {
@@ -224,6 +235,17 @@ void IrcInterfaceModule::nameResolved(string name, list<string> addresses,
 	if(m_remoteNode.name != name || m_connection)
 		return;
 
+	if(status != NRS_OK)
+	{
+		if(m_reconnectTimeout == TIMEOUT_EMPTY)
+		{
+			m_reconnectTimeout = m_daemon->getTimeoutManager()->
+				scheduleTimeout(30, this);
+		}
+
+		return;
+	}
+
 	remoteNode.name = addresses.front();
 	remoteNode.port = m_remoteNode.port;
 
@@ -266,6 +288,9 @@ bool IrcInterfaceModule::stop()
 		m_connection->quit();
 		return false;
 	}
+
+	if(m_reconnectTimeout != TIMEOUT_EMPTY)
+		m_daemon->getTimeoutManager()->dropTimeout(m_reconnectTimeout);
 
 	return true;
 }
