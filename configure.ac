@@ -5,6 +5,9 @@ AC_PREREQ(2.59)
 AC_INIT([mwcollectd], [4.0.0], [gw@mwcollect.org])
 AM_INIT_AUTOMAKE([mwcollectd], [4.0.0])
 
+AC_PREFIX_DEFAULT(/opt/mwcollectd)
+AC_DEFINE_UNQUOTED(PREFIX, "$prefix")
+
 AC_REVISION([1])
 
 AC_PROG_CXX
@@ -13,7 +16,6 @@ AC_LANG_CPLUSPLUS
 
 
 AC_CHECK_HEADERS([stdint.h stdlib.h string.h strings.h unistd.h])
-
 
 dnl **************************************************
 dnl * libnetworkd Support                            *
@@ -31,6 +33,43 @@ else
 	AC_MSG_ERROR([libnetworkd not found, please give correct path or install])
 fi
 
+dnl **************************************************
+dnl * python Support                                 *
+dnl **************************************************
+
+
+AC_SUBST([PYTHON_CPPFLAGS])
+AC_SUBST([PYTHON_LDFLAGS])
+
+do_enable_python="yes"
+
+AC_ARG_ENABLE(python, [  --enable-python    enable python support [[default yes]]], [do_enable_python=$enableval])
+
+enable_python=${do_enable_python}
+
+if test x"$enable_python" = "xyes"; then
+	if test -x "/usr/bin/python3-config"; then
+		ORIG_LDFLAGS=${LDFLAGS}
+		ORIG_CPPFLAGS=${CPPFLAGS}
+		PYTHON_LDFLAGS=" `/usr/bin/python3-config --ldflags`"
+		PYTHON_CPPFLAGS=" `/usr/bin/python3-config --includes`"
+		LDFLAGS+=${PYTHON_LDFLAGS}
+		CPPFLAGS+=${PYTHON_CPPFLAGS}
+
+		AC_CHECK_HEADER([Python.h],[enable_python="yes"],[enable_python=""])
+
+		if test x"$enable_python" = "xyes"; then
+			AC_CHECK_LIB([python3.0],[Py_Initialize],[enable_python="yes"],[enable_python=""])
+		fi
+
+		LDFLAGS=${ORIG_LDFLAGS}
+		CPPFLAGS=${ORIG_CPPFLAGS}
+
+		echo linking against python 3.0
+	else
+		AC_MSG_ERROR([No /usr/bin/python3-config found, please install python >= 3.0])
+	fi
+fi
 
 dnl **************************************************
 dnl * libemu Support                           	     *
@@ -347,6 +386,7 @@ ACX_PTHREAD( [LIBS="$PTHREAD_LIBS $LIBS"
 
 AM_CONDITIONAL(LIBEMU_MODULE, [test x$enable_libemu = "xyes"])
 AM_CONDITIONAL(NFQ_MODULE, [test x$enable_nfq = "xyes"])
+AM_CONDITIONAL(PYTHON_MODULE, [test x$enable_python = "xyes"])
 
 
 
@@ -361,6 +401,7 @@ AC_OUTPUT([
 	src/dynserv-mirror/Makefile
 	src/filestore-streams/Makefile
 	src/shellcode-libemu/Makefile
+	src/embed-python/Makefile
 	])
 
 
