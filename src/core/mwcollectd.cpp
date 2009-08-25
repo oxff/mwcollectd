@@ -53,7 +53,7 @@ void sigint_handler(int signal)
 
 int main(int argc, char * argv[])
 {
-	const char * configPath = CFGPREFIX "/etc/mwcollectd/mwcollectd.conf";
+	const char * configPath = PREFIX "/etc/mwcollectd/mwcollectd.conf";
 	const char * changeUser = 0;
 	bool backgroundDaemon = true;
 

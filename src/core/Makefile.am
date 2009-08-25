@@ -3,7 +3,7 @@
 
 AUTOMAKE_OPTIONS = foreign
 
-AM_CPPFLAGS = -DMWCOLLECTD_CORE -DCFGPREFIX=\"@prefix@\" -I../include/ -Wall -Werror -Wno-deprecated
+AM_CPPFLAGS = -DMWCOLLECTD_CORE -I../include/ -Wall -Werror -Wno-deprecated
 
 
 sbin_PROGRAMS  = mwcollectd
