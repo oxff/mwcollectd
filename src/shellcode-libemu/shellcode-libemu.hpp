@@ -39,7 +39,9 @@ using namespace mwcollectd;
 
 
 #include <list>
+#include <tr1/unordered_map>
 using namespace std;
+using namespace std::tr1;
 
 #include <pthread.h>
 
@@ -70,6 +72,57 @@ extern "C" {
 
 
 
+class EmulatorSession;
+
+class EmulatorSocket : public IOSocket
+{
+public:
+	inline EmulatorSocket(EmulatorSession * session, struct emu_memory * memory)
+		: m_fd(-1), m_rbuf(0), m_state(SS_UNINIT)
+	{ m_session = session; m_memory = memory; m_ioSocketState = IOSOCKSTAT_IGNORE; }
+
+	virtual ~EmulatorSocket();
+
+	virtual void pollRead();
+	virtual void pollWrite();
+	virtual void pollError();
+
+	bool socket();
+	int write(const uint8_t * buffer, size_t length);
+	int read(uint32_t guestbuf, size_t length);
+	int connect(uint32_t addr, uint16_t port);
+	int bind(uint32_t addr, uint16_t port);
+	int listen(uint32_t backlog);
+	int accept(uint32_t guestaddr, uint32_t addrsize);
+
+	inline int getFd()
+	{ return m_fd; }
+
+protected:
+	inline EmulatorSocket(int fd, EmulatorSession * session, struct emu_memory * memory)
+		: m_rbuf(0), m_state(SS_CONNECTED)
+	{ m_fd = fd; m_session = session; m_memory = memory; m_ioSocketState = IOSOCKSTAT_IGNORE; }
+
+private:
+	int m_fd;
+
+	basic_string<uint8_t> m_outputBuffer;
+	EmulatorSession * m_session;
+
+	uint32_t m_rbuf;
+	size_t m_rsize, m_wsize;
+
+	enum SocketState
+	{
+		SS_UNINIT,
+		SS_CONNECTING,
+		SS_LISTENING,
+		SS_CONNECTED,
+	} m_state;
+
+	struct emu_memory * m_memory;
+};
+
 class EmulatorSession
 {
 public:
@@ -79,10 +132,44 @@ public:
 
 	bool step();
 
+	inline bool isActive()
+	{ return m_active; }
+	inline void yield()
+	{ m_active = false; }
+
 	void addDirectDownload(const char * url, const char * localFile);
+
+
+	int createSocket();
+	int destroySocket(int fd);
+
+	inline EmulatorSocket * getSocket(int fd)
+	{
+		unordered_map<int32_t, EmulatorSocket *>::iterator it = m_sockets.find(fd);
+
+		if(it == m_sockets.end())
+			return 0;
+
+		return it->second;
+	}
+
+
+	uint32_t createFile(const char * filename);
+	bool appendFile(uint32_t handle, uint8_t * buffer, uint32_t length);
+	void closeHandle(uint32_t handle);
+
+
+	void createProcess(const char * image, const char * cmd);	
+
+	inline void resetStepCounter()
+	{ m_steps = 0; }
 
 protected:
 	void registerHooks();
+
+	int registerSocket(EmulatorSocket * socket);
+	void socketWakeup(int result);
+	friend class EmulatorSocket;
 
 private:
 	struct emu * m_emu;
@@ -91,8 +178,25 @@ private:
 
 	uint32_t m_steps;
 
+	class VirtualFile
+	{
+	public:
+		VirtualFile()
+		{ off = 0; }
+
+		string name;
+		basic_string<uint8_t> contents;
+		uint32_t off;
+	};
+
+	unordered_map<int32_t, EmulatorSocket *> m_sockets;
+	unordered_map<uint32_t, VirtualFile> m_files;
+
+	uint32_t m_sockfdCounter;
+
 	Daemon * m_daemon;
 	StreamRecorder * m_recorder;
+	bool m_active;
 };
 
 class AnalyzerThread;
@@ -116,12 +220,14 @@ public:
 	virtual bool computationPending()
 	{ return !m_emulators.empty(); }
 
-
 	struct Result
 	{
 		StreamRecorder * recorder;
 		int shellcodeOffset;
 	};
+
+protected:
+	void updateEmulatorStates();
 
 private:
 	Daemon * m_daemon;
@@ -135,7 +241,7 @@ private:
 
 	vector<AnalyzerThread *> m_threads;
 
-	list<EmulatorSession *> m_emulators;
+	list<EmulatorSession *> m_emulators, m_sleepingEmulators;
 
 	bool m_exiting;
 };

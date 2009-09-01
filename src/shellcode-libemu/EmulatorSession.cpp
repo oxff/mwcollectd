@@ -46,6 +46,8 @@ EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
 	m_env = emu_env_new(m_emu);
 
 	m_steps = 0;
+	m_active = true;
+	m_sockfdCounter = 1952;
 
 	if(!m_emu || !m_env)
 		throw;
@@ -56,13 +58,15 @@ EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
 	m_cpu = emu_cpu_get(m_emu);
 
 	// Do not use a static value or you'll run into easy detectability,
-	// but not initializing this either could be yield memory disclosure vuln.
+	// but not initializing this either could result in a memory disclosure vuln.
 	for(int i = 0; i < 8; ++i)
 		emu_cpu_reg32_set(m_cpu, (emu_reg32) i, rand());
 
 	// Somebody please show Markus const pointers... :/
 	emu_memory_write_block(mem, CODE_OFFSET, (void *) data, size);
 	emu_cpu_eip_set(m_cpu, CODE_OFFSET + startOffset);
+
+	emu_cpu_reg32_set(m_cpu, esp, 0x0012fe98);
 
 	registerHooks();
 
@@ -80,18 +84,38 @@ EmulatorSession::~EmulatorSession()
 
 	if(m_recorder)
 		m_recorder->release();
+	
+	for(unordered_map<int32_t, EmulatorSocket *>::iterator it = m_sockets.begin();
+		it != m_sockets.end(); ++it)
+	{
+		m_daemon->getNetworkManager()->removeSocket(it->second);
+		delete it->second;
+	}
 }
 
 void EmulatorSession::registerHooks()
 {
+	emu_env_w32_export_hook(m_env, "CreateFileA", schooks::hook_CreateFile, this);
+	emu_env_w32_export_hook(m_env, "WriteFile", schooks::hook_WriteFile, this);
+	emu_env_w32_export_hook(m_env, "CloseHandle", schooks::hook_CloseHandle, this);
+
+	emu_env_w32_export_hook(m_env, "CreateProcessA", schooks::hook_CreateProcess, this);
+	emu_env_w32_export_hook(m_env, "WinExec", schooks::hook_CreateProcess, this);
 	emu_env_w32_export_hook(m_env, "ExitProcess", schooks::hook_ExitProcess, this);
 	emu_env_w32_export_hook(m_env, "ExitThread", schooks::hook_ExitThread, this);
 
 	emu_env_w32_load_dll(m_env->env.win, (char *) "urlmon.dll");
 	emu_env_w32_export_hook(m_env, "URLDownloadToFileA", schooks::hook_URLDownloadToFile, this);
 
-
-	// TODO: moar...
+	emu_env_w32_load_dll(m_env->env.win, (char *) "ws2_32.dll");
+	emu_env_w32_export_hook(m_env, "socket", schooks::hook_socket, this);
+	emu_env_w32_export_hook(m_env, "closesocket", schooks::hook_closesocket, this);
+	emu_env_w32_export_hook(m_env, "connect", schooks::hook_connect, this);
+	emu_env_w32_export_hook(m_env, "bind", schooks::hook_bind, this);
+	emu_env_w32_export_hook(m_env, "listen", schooks::hook_listen, this);
+	emu_env_w32_export_hook(m_env, "accept", schooks::hook_accept, this);
+	emu_env_w32_export_hook(m_env, "recv", schooks::hook_recv, this);
+	emu_env_w32_export_hook(m_env, "send", schooks::hook_send, this);
 }
 
 bool EmulatorSession::step()
@@ -101,15 +125,10 @@ bool EmulatorSession::step()
 
 	gettimeofday(&start, 0);
 #endif
+	size_t k;
 
-	for(size_t k = 0; k < 4096; ++k)
+	for(k = 0; m_active && k < 4096; ++k)
 	{
-		if(++m_steps > 1000000)
-		{
-			LOG(L_CRIT, "Exceeded max steps limit.");
-
-			return false;
-		}
 
 		struct emu_env_hook * userHook;
 
@@ -140,6 +159,13 @@ bool EmulatorSession::step()
 			return false;
 		}
 	}
+		
+	if((m_steps += k) > 1000000)
+	{
+		LOG(L_CRIT, "Exceeded max steps limit.");
+		return false;
+	}
+
 
 #ifdef BENCHMARK_LIBEMU
 	gettimeofday(&end, 0);
@@ -170,4 +196,111 @@ void EmulatorSession::addDirectDownload(const char * url, const char * filename)
 	}
 }
 
+
+void EmulatorSession::socketWakeup(int result)
+{
+	m_active = true;
+	emu_cpu_reg32_set(m_cpu, eax, (uint32_t) result);
+}
+
+
+int EmulatorSession::createSocket()
+{
+	if(m_sockets.size() >= 4)
+		return -1;
+
+	EmulatorSocket * socket = new EmulatorSocket(this, emu_memory_get(m_emu));
+
+	if(!socket->socket())
+	{
+		delete socket;
+		return -1;
+	}
+
+	m_daemon->getNetworkManager()->addSocket(socket, socket->getFd());
+
+	m_sockfdCounter -= 4;
+	m_sockets[m_sockfdCounter] = socket;
+	return m_sockfdCounter;
+}
+
+int EmulatorSession::registerSocket(EmulatorSocket * socket)
+{
+	if(m_sockets.size() >= 4)
+	{
+		delete socket;
+		return -1;
+	}
+
+	m_daemon->getNetworkManager()->addSocket(socket, socket->getFd());
+
+	m_sockfdCounter -= 4;
+	m_sockets[m_sockfdCounter] = socket;
+
+	LOG(L_INFO, "Registered new socket %p as %u.", socket, m_sockfdCounter);
+
+	return m_sockfdCounter;
+}
+
+int EmulatorSession::destroySocket(int fd)
+{
+	unordered_map<int32_t, EmulatorSocket *>::iterator it = m_sockets.find(fd);
+
+	if(it == m_sockets.end())
+		return  -1;
+
+	m_daemon->getNetworkManager()->removeSocket(it->second);
+	delete it->second;
+
+	m_sockets.erase(it);
+
+	return 0;
+}
+
+
+uint32_t EmulatorSession::createFile(const char * filename)
+{
+	uint32_t handle;
+
+	do {
+		handle = ((rand() & 0xff) << 16) | (rand() & 0xfff0);
+	} while (m_files.find(handle) != m_files.end());
+
+	m_files[handle] = VirtualFile();
+	m_files[handle].name = filename;
+	return handle;
+}
+
+bool EmulatorSession::appendFile(uint32_t handle, uint8_t * buffer, uint32_t length)
+{
+	unordered_map<uint32_t, VirtualFile>::iterator it = m_files.find(handle);
+
+	LOG(L_SPAM, "%s: %u", __PRETTY_FUNCTION__, length);
+
+	if(it == m_files.end())
+		return false;
+
+	it->second.contents.append(buffer, length);
+	it->second.off += length;
+
+	return true;
+}
+
+void EmulatorSession::closeHandle(uint32_t handle)
+{
+	unordered_map<uint32_t, VirtualFile>::iterator it = m_files.find(handle);
+
+	if(it == m_files.end())
+		return;
+
+	LOG(L_SPAM, "%p wrote \"%s\" with contents \"%s\".", m_recorder,
+		it->second.name.c_str(), it->second.contents.c_str());
+	m_files.erase(it);
+}
+
+
+void EmulatorSession::createProcess(const char * image, const char * commandline)
+{
+	LOG(L_SPAM, "Shellcode for recorder %p creates process of \"%s\".", image);
+}
 

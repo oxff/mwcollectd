@@ -34,11 +34,25 @@ namespace schooks
 {
 
 
+uint32_t hook_CreateFile(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_WriteFile(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_CloseHandle(struct emu_env *env, struct emu_env_hook *hook, ...);
+
+uint32_t hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_WinExec(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t hook_ExitProcess(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t hook_ExitThread(struct emu_env *env, struct emu_env_hook *hook, ...);
 
-
 uint32_t hook_URLDownloadToFile(struct emu_env *env, struct emu_env_hook *hook, ...);
+
+uint32_t hook_socket(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_closesocket(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_listen(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_recv(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hook_send(struct emu_env *env, struct emu_env_hook *hook, ...);
 
 
 }

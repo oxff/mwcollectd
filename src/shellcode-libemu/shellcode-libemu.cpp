@@ -142,6 +142,8 @@ void ShellcodeLibemuModule::loop()
 {
 	Result result;
 
+	updateEmulatorStates();
+
 	for(list<EmulatorSession *>::iterator it = m_emulators.begin();
 		it != m_emulators.end(); ++it)
 	{
@@ -206,6 +208,31 @@ void ShellcodeLibemuModule::loop()
 				result.recorder);
 
 			result.recorder->release();
+		}
+	}
+}
+
+void ShellcodeLibemuModule::updateEmulatorStates()
+{
+	for(list<EmulatorSession *>::iterator next, it = m_emulators.begin(); it != m_emulators.end(); it = next)
+	{
+		next = it; ++next;
+
+		if(! (* it)->isActive())
+		{
+			m_sleepingEmulators.push_back(* it);
+			m_emulators.erase(it);
+		}
+	}
+
+	for(list<EmulatorSession *>::iterator next, it = m_sleepingEmulators.begin(); it != m_sleepingEmulators.end(); it = next)
+	{
+		next = it; ++next;
+
+		if((* it)->isActive())
+		{
+			m_emulators.push_back(* it);
+			m_sleepingEmulators.erase(it);
 		}
 	}
 }
