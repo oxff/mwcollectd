@@ -51,7 +51,7 @@ if test x"$enable_python" = "xyes"; then
 	if test -x "/usr/bin/python3-config"; then
 		ORIG_LDFLAGS=${LDFLAGS}
 		ORIG_CPPFLAGS=${CPPFLAGS}
-		PYTHON_LDFLAGS=" `/usr/bin/python3-config --ldflags`"
+		PYTHON_LDFLAGS=" `/usr/bin/python3-config --ldflags` -L`/usr/bin/python3-config --prefix`/lib"
 		PYTHON_CPPFLAGS=" `/usr/bin/python3-config --includes`"
 		LDFLAGS+=${PYTHON_LDFLAGS}
 		CPPFLAGS+=${PYTHON_CPPFLAGS}
@@ -59,7 +59,7 @@ if test x"$enable_python" = "xyes"; then
 		AC_CHECK_HEADER([Python.h],[enable_python="yes"],[enable_python=""])
 
 		if test x"$enable_python" = "xyes"; then
-			AC_CHECK_LIB([python3.0],[Py_Initialize],[enable_python="yes"],[enable_python=""])
+			AC_CHECK_LIB([python3.1],[Py_Initialize],[enable_python="yes"],[enable_python=""])
 		fi
 
 		LDFLAGS=${ORIG_LDFLAGS}
