@@ -22,6 +22,7 @@ SUBDIRS = core \
 	  dynserv-mirror \
 	  filestore-streams \
 	  $(shellcode_libemu_dir) \
-	  $(embed_python_dir)
+	  $(embed_python_dir) \
+	  log-file
 
 EXTRA_DIST = README
