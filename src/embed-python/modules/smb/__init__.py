@@ -189,7 +189,7 @@ class smbd(NetworkEndpoint):
 			# self.outbuf should contain response packet now
 			if not self.outbuf:
 				if self.state['stop']:
-					smblog.debug('drop dead!')
+					self.close()
 				else:
 					smblog.critical('dcerpc processing failed. bailing out.')
 				return rp
@@ -211,7 +211,7 @@ class smbd(NetworkEndpoint):
 
 			if not self.outbuf:
 				if self.state['stop']:
-					smblog.debug('drop dead!')
+					self.close()
 				else:
 					smblog.critical('dcerpc processing failed. bailing out.')
 				return rp
@@ -315,7 +315,7 @@ class epmapper(smbd):
 
 		if not r:
 			if self.state['stop']:
-				smblog.debug('drop dead!')
+				self.close()
 			else:
 				smblog.critical('dcerpc processing failed. bailing out.')
 			return len(data)

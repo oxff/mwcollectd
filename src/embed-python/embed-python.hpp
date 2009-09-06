@@ -93,6 +93,11 @@ public:
 		m_recorder->appendStreamData(StreamRecorder::DIR_OUTGOING,
 			buffer, length);
 	}
+
+	inline void close()
+	{
+		m_socket->close();
+	}
 				
 
 	inline void setSocket(NetworkSocket * sock)

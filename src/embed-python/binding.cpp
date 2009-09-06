@@ -69,8 +69,23 @@ static PyObject * mwcollectd_NetworkEndpoint_send(PyObject *self, PyObject *args
 	Py_RETURN_NONE;
 }
 
+static PyObject * mwcollectd_NetworkEndpoint_close(PyObject *self, PyObject *args)
+{
+	if(!((mwcollectd_NetworkEndpoint *) self)->endpoint)
+	{
+		PyErr_SetString(PyExc_ValueError, "Endpoint is not initialized (connect it first).");
+		return 0;
+	}
+
+	((mwcollectd_NetworkEndpoint *) self)->endpoint->close();
+
+	Py_RETURN_NONE;
+}
+
 
 static PyMethodDef mwcollectd_NetworkEndpoint_methods[] = {
+	{ "close", mwcollectd_NetworkEndpoint_close, METH_NOARGS,
+		"Close the current connection." },
 	{ "send", mwcollectd_NetworkEndpoint_send, METH_VARARGS,
 		"Send a given byte buffer out to the network." },
 	{ 0, 0, 0, 0 }
