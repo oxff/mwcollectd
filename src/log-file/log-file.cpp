@@ -48,7 +48,7 @@ LogFileModule::LogFileModule(Daemon * daemon)
 
 bool LogFileModule::start(Configuration * moduleConfiguration)
 {
-	m_filename = PREFIX "/var/log/mwcollectd.log";
+	m_filename = PREFIX "/var/log/mwcollectd/mwcollectd.log";
 
 	if(moduleConfiguration)
 		m_filename = moduleConfiguration->getString(":filename", m_filename.c_str());
