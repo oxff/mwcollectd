@@ -13,3 +13,17 @@ embed_python_la_SOURCES += PythonEndpoint.cpp
 embed_python_la_SOURCES += binding.cpp
 embed_python_la_CPPFLAGS = $(PYTHON_CPPFLAGS)
 embed_python_la_LDFLAGS = -module -no-undefined -avoid-version $(PYTHON_LDFLAGS)
+
+install-data-local:
+	$(mkinstalldirs) $(DESTDIR)$(libdir)
+	$(mkinstalldirs) $(DESTDIR)$(libdir)/mwcollectd
+	$(mkinstalldirs) $(DESTDIR)$(libdir)/mwcollectd/python
+
+	for py in `find ./modules/ -name '*.py'`; do \
+		target=$(DESTDIR)$(libdir)/mwcollectd/python/`echo "$$py" | sed 's/\.\/modules\///'`; \
+		dir=`dirname $$target`; \
+		if [ ! -d $$dir ]; then \
+			$(mkinstalldirs) "$$dir"; \
+		fi; \
+		$(INSTALL_DATA) "$$py" "$$target"; \
+	done

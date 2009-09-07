@@ -11,3 +11,7 @@ pkglib_LTLIBRARIES = log-file.la
 log_file_la_SOURCES  = log-file.cpp
 log_file_la_SOURCES += LogFile.cpp
 log_file_la_LDFLAGS  = -module -no-undefined -avoid-version
+
+install-data-local:
+	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/log
+	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/log/mwcollectd
