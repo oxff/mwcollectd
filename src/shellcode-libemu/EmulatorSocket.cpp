@@ -309,8 +309,11 @@ int EmulatorSocket::accept(uint32_t guestbuf, uint32_t length)
 		return -1;
 	}
 
-	if(emu_memory_write_block(m_memory, guestbuf, buf, length) < 0)
+	if(guestbuf)
+	{
+		if(emu_memory_write_block(m_memory, guestbuf, buf, length) < 0)
 			return -1;
+	}
 
 	return m_session->registerSocket(new EmulatorSocket(res, m_session, m_memory));
 }
