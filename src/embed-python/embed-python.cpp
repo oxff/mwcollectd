@@ -60,6 +60,44 @@ bool EmbedPythonModule::start(Configuration * config)
 			LOG(L_CRIT, "No submodules defined for python extension module!");
 			return false;
 		}
+
+		{
+			string mode = config->getString(":servers:mode", "dynamic");
+			m_enforceAddress = config->getString(":servers:enforce-ip", "0.0.0.0");
+
+			static const struct {
+				PythonServerMode mode;
+				const char * literal;
+			} modeMap[] = {
+				{ PYSRVM_DYNAMIC, "dynamic" },
+				{ PYSRVM_BIND, "bind" },
+				{ (PythonServerMode) 0, 0 }
+			};
+
+			size_t k;
+
+			for(k = 0; modeMap[k].literal; ++k)
+			{
+				if(mode == modeMap[k].literal)
+				{
+					m_serverMode = modeMap[k].mode;
+					break;
+				}
+			}
+
+			if(!modeMap[k].literal)
+			{
+				LOG(L_CRIT, "Unsupported server mode '%s' for embed-python:servers:mode!", mode.c_str());
+				return false;
+			}
+
+			if(!inet_aton(m_enforceAddress.c_str(), 0))
+			{
+				LOG(L_CRIT, "Invalid IP '%s' for embed-python:servers:enforce-ip; set to '0.0.0.0' to disable!",
+					m_enforceAddress.c_str());
+				return false;
+			}
+		}
 	}
 	
 	{
@@ -69,6 +107,12 @@ bool EmbedPythonModule::start(Configuration * config)
 
 		if(!prepath || (m_modulepath + ":") != string(prepath).substr(0, m_modulepath.size() + 1))
 			setenv("PYTHONPATH", prepath ? (m_modulepath + ":" + prepath).c_str() : m_modulepath.c_str(), 1);
+	}
+
+	if(!m_daemon->getEventManager()->subscribeEventMask("stream.request", this))
+	{
+		LOG(L_CRIT, "Could not subscribe to \"stream.request\" event.");
+		return false;
 	}
 
 
@@ -305,7 +349,60 @@ bool EmbedPythonModule::stop()
 	m_modules.clear();
 
 	Py_Finalize();
+
+	m_daemon->getEventManager()->unsubscribeAll(this);
+
 	return true;
+}
+
+void EmbedPythonModule::handleEvent(Event * ev)
+{
+	if(* (* ev)["protocol"] != "tcp")
+		return;
+
+	StreamProviderMap::iterator it = m_providers.find((* ev)["port"].getIntegerValue());
+
+	if(it == m_providers.end())
+		return;
+
+	if(it->second.servers.find(* (* ev)["address"]) != it->second.servers.end())
+	{
+		(* ev)["done"] = 1;
+		return;
+	}
+
+	NetworkNode node = { * (* ev)["address"], (* ev)["port"].getIntegerValue() };
+
+	DynamicPythonEndpointFactory * factory = new DynamicPythonEndpointFactory(it->second.type, * (* ev)["address"],
+		(* ev)["port"].getIntegerValue());
+	NetworkSocket * server;
+	
+	if(!(server = m_daemon->getNetworkManager()->serverStream(&node, factory, 4)))
+	{
+		LOG(L_SPAM, "Could not create dynamic python server on '%s':%hu.", node.name.c_str(), node.port);
+		delete factory;
+
+		return;
+	}
+
+	LOG(L_SPAM, "%s: %p, %p", __PRETTY_FUNCTION__, factory, server);
+
+	it->second.servers.insert(StreamProvider::ServerMap::value_type(* (* ev)["address"],
+		pair<NetworkSocket *, DynamicPythonEndpointFactory *>(server, factory)));
+	factory->setTimeout(m_daemon->getTimeoutManager()->scheduleTimeout(30, factory));
+
+	(* ev)["done"] = 1;
+}
+	
+void EmbedPythonModule::deregisterStreamProvider(uint16_t port)
+{
+	StreamProviderMap::iterator it = m_providers.find(port);
+
+	if(it == m_providers.end())
+		return;
+
+	for(StreamProvider::ServerMap::iterator jt = it->second.servers.begin(); jt != it->second.servers.end(); ++jt)
+		jt->second.second->decref();
 }
 
 

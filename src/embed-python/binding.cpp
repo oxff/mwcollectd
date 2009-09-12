@@ -111,8 +111,17 @@ static PyTypeObject mwcollectd_NetworkEndpointType = {
 typedef struct {
 	PyObject_HEAD
 	PyObject * endpointType;
-	PythonEndpointFactory * factory;
-	NetworkSocket * server;
+	EmbedPythonModule::PythonServerMode mode;
+
+	union
+	{
+		struct {
+			PythonEndpointFactory * factory;
+			NetworkSocket * server;
+		};
+
+		uint16_t port;
+	};
 } mwcollectd_NetworkServer;
 
 static PyObject * mwcollectd_NetworkServer_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -141,21 +150,53 @@ static PyObject * mwcollectd_NetworkServer_new(PyTypeObject *type, PyObject *arg
 
 	Py_INCREF(self->endpointType);
 	
-	if(!(self->factory = new PythonEndpointFactory((PyTypeObject *) self->endpointType)))
+	self->mode = g_module->getServerMode();
+
+	if(strcmp(address, "0.0.0.0") && strcmp(address, "any"))
+		self->mode = EmbedPythonModule::PYSRVM_BIND;
+
+	switch(self->mode)
 	{
-		Py_DECREF(self->endpointType);
-		return 0;
-	}
+		case EmbedPythonModule::PYSRVM_BIND:	
+		{
+			NetworkNode localNode = { string(address), port };
 
-	NetworkNode localNode = { string(address), port };
+			if(strcmp(address, "0.0.0.0") && strcmp(address, "any") && g_module->getEnforceAddress() != "0.0.0.0")
+				localNode.name = g_module->getEnforceAddress();
 
-	if(!(self->server = g_daemon->getNetworkManager()->serverStream(&localNode, self->factory, backlog)))
-	{
-		delete self->factory;
-		Py_DECREF(self->endpointType);
+			if(!(self->factory = new PythonEndpointFactory((PyTypeObject *) self->endpointType)))
+			{
+				Py_DECREF(self->endpointType);
+				return 0;
+			}
 
-		PyErr_SetString(PyExc_RuntimeError, "Could not bind socket to specified address, it's either in use or the address string is faulty.");
-		return 0;
+			if(!(self->server = g_daemon->getNetworkManager()->serverStream(&localNode, self->factory, backlog)))
+			{
+				delete self->factory;
+				Py_DECREF(self->endpointType);
+
+				PyErr_Format(PyExc_RuntimeError, "Could not bind socket to '%s':%hu, "
+					"it's either in use or the address string is faulty.", localNode.name.c_str(),
+					localNode.port);
+				return 0;
+			}
+
+			break;
+		}
+
+		case EmbedPythonModule::PYSRVM_DYNAMIC:
+			self->port = port;
+
+			if(!g_module->registerStreamProvider(port, (PyTypeObject *) self->endpointType))
+			{
+				delete self->factory;
+				Py_DECREF(self->endpointType);
+
+				PyErr_Format(PyExc_RuntimeError, "Could not register dynamic stream provider for port :%hu.", port);
+				return 0;
+			}
+
+			break;
 	}
 
 	return (PyObject *) self;
@@ -163,26 +204,62 @@ static PyObject * mwcollectd_NetworkServer_new(PyTypeObject *type, PyObject *arg
 
 static void mwcollectd_NetworkServer_dealloc(mwcollectd_NetworkServer * self)
 {
-	if(self->server && !self->server->close(true))
-		delete self->server;
+	switch(self->mode)
+	{
+		case EmbedPythonModule::PYSRVM_BIND:
+			if(self->server && !self->server->close(true))
+				delete self->server;
 
+			if(self->factory)
+				self->factory->decref();
+
+			break;
+
+
+		case EmbedPythonModule::PYSRVM_DYNAMIC:
+			if(self->port)
+			{
+				g_module->deregisterStreamProvider(self->port);
+				self->port = 0;
+			}
+
+			break;
+	}
+	
 	Py_XDECREF(self->endpointType);
-	self->factory->decref();
 
 	Py_TYPE((PyObject *) self)->tp_free(self);
 }
 
 static PyObject * mwcollectd_NetworkServer_close(mwcollectd_NetworkServer * self, PyObject * args)
 {
-	if(!self->server->close(true))
+	switch(self->mode)
 	{
-		PyErr_SetString(PyExc_RuntimeError, "Could not close server socket.");
-		return 0;
+		case EmbedPythonModule::PYSRVM_BIND:
+			if(!self->server->close(true))
+			{
+				PyErr_SetString(PyExc_RuntimeError, "Could not close server socket.");
+				return 0;
+			}
+
+			self->server = 0;
+
+			Py_RETURN_NONE;
+
+
+		case EmbedPythonModule::PYSRVM_DYNAMIC:
+			if(self->port)
+			{
+				g_module->deregisterStreamProvider(self->port);
+				self->port = 0;
+			}
+
+			Py_RETURN_NONE;
+
+		default:
+			PyErr_SetString(PyExc_NotImplementedError, __PRETTY_FUNCTION__);
+			return 0;
 	}
-
-	self->server = 0;
-
-	Py_RETURN_NONE;
 }
 
 

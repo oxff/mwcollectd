@@ -36,10 +36,14 @@
 using namespace mwcollectd;
 
 #include <list>
+#include <tr1/unordered_map>
 using namespace std;
+using namespace std::tr1;
 
 
-class EmbedPythonModule : public Module
+class DynamicPythonEndpointFactory;
+
+class EmbedPythonModule : public Module, public EventSubscriber
 {
 public:
 	EmbedPythonModule(Daemon * daemon)
@@ -54,15 +58,76 @@ public:
 	virtual const char * getDescription() { return "Embeds the python"
 		" language for service emulation."; }
 
+	virtual void handleEvent(Event * ev);
 
 	static string toString(PyObject * obj);
 	void logError();
+
+	enum PythonServerMode
+	{
+		PYSRVM_DYNAMIC,
+		PYSRVM_BIND,
+	};
+
+	inline PythonServerMode getServerMode()
+	{ return m_serverMode; }
+
+	inline const string& getEnforceAddress()
+	{ return m_enforceAddress; }
+
+	inline bool registerStreamProvider(uint16_t port, PyTypeObject * type)
+	{
+		pair<StreamProviderMap::iterator, bool> result = 
+			m_providers.insert(StreamProviderMap::value_type(port, StreamProvider(type)));
+		
+		return result.second;
+	}
+
+	void deregisterStreamProvider(uint16_t port);
+
+protected:
+	inline void deregisterFactory(string address, uint16_t port, DynamicPythonEndpointFactory * factory)
+	{
+		StreamProviderMap::iterator it = m_providers.find(port);
+		StreamProvider::ServerMap::iterator jt;
+
+		if(it == m_providers.end())
+			return;
+
+		if((jt = it->second.servers.find(address)) == it->second.servers.end())
+			return;
+
+		if(jt->second.second != factory)
+			return;
+
+		jt->second.first->close();
+		it->second.servers.erase(jt);
+	}
+
+	friend class DynamicPythonEndpointFactory;
 
 private:
 	Daemon * m_daemon;
 	string m_modulepath;
 
 	list<PyObject *> m_modules;
+
+	string m_enforceAddress;
+	PythonServerMode m_serverMode;
+
+	struct StreamProvider
+	{
+		StreamProvider(PyTypeObject * t)
+		{ type = t; }
+
+		PyTypeObject * type;
+
+		typedef unordered_map<string, pair<NetworkSocket *, DynamicPythonEndpointFactory *> > ServerMap;
+		ServerMap servers;
+	};
+
+	typedef unordered_map<uint16_t, StreamProvider> StreamProviderMap;
+	StreamProviderMap m_providers;
 };
 
 extern EmbedPythonModule * g_module;
@@ -147,6 +212,30 @@ private:
 	size_t m_refCount;
 };
 
+class DynamicPythonEndpointFactory : public PythonEndpointFactory, public TimeoutReceiver
+{
+public:
+	DynamicPythonEndpointFactory(PyTypeObject * type, string address, uint16_t port)
+		: PythonEndpointFactory(type)
+	{
+		m_address = address;
+		m_port = port;
+	}
+
+	virtual ~DynamicPythonEndpointFactory()
+	{ g_module->deregisterFactory(m_address, m_port, this); }
+
+	virtual NetworkEndpoint * createEndpoint(NetworkSocket * clientSocket);
+
+	virtual void timeoutFired(Timeout timeout);
+	inline void setTimeout(Timeout t)
+	{ m_timeout = t; }
+
+protected:
+	string m_address;
+	uint16_t m_port;
+	Timeout m_timeout;
+};
 
 PyMODINIT_FUNC PyInit_mwcollectd();
 

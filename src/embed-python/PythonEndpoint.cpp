@@ -194,3 +194,21 @@ void PythonEndpointFactory::destroyEndpoint(NetworkEndpoint * endpoint)
 	decref();
 }
 
+
+void DynamicPythonEndpointFactory::timeoutFired(Timeout timeout)
+{
+	if(timeout != m_timeout)
+		return;
+
+	GLOG(L_SPAM, "%s [%s, %hu]", __PRETTY_FUNCTION__, m_address.c_str(), m_port);
+	decref();
+}
+
+NetworkEndpoint * DynamicPythonEndpointFactory::createEndpoint(NetworkSocket * clientSocket)
+{
+	g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
+	m_timeout = g_daemon->getTimeoutManager()->scheduleTimeout(30, this);
+
+	return PythonEndpointFactory::createEndpoint(clientSocket);
+}
+
