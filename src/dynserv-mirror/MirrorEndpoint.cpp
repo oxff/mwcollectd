@@ -44,6 +44,16 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 
 	m_StreamRecorder = new StreamRecorder(remoteNode, localNode);
 
+	m_idleTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(15, this);
+
+	if(remoteNode->name == "127.0.0.1")
+	{
+		m_reverseSocket = 0;
+		return;
+	}
+
+	m_reverseTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(5, this);
+
 	if(!(m_reverseSocket = g_daemon->getNetworkManager()->connectStream(
 		&remote, &m_reverseEndpoint)))
 	{
@@ -52,9 +62,6 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 	else
 		GLOG(L_SPAM, "Mirror connection to %s:%hu initiating...",
 			remoteNode->name.c_str(), localNode->port);
-
-	m_idleTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(15, this);
-	m_reverseTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(5, this);
 }
 
 void MirrorEndpoint::connectionClosed()

@@ -163,7 +163,10 @@ bool DynamicServerMirror::mirrorPort(uint16_t port)
 
 void DynamicServerMirror::handleEvent(Event * event)
 {
-	ASSERT(event->getName() == "dynserv.request");
+	ASSERT(event->getName() == "stream.request");
+
+	if((* event)["done"].getIntegerValue())
+		return;
 
 	uint16_t port = (* event)["port"].getIntegerValue();
 
@@ -197,7 +200,9 @@ void DynamicServerMirror::handleEvent(Event * event)
 	{
 		m_servers[Server(local.name, port)] = server;
 		server->setSocket(socket);
-	}
+
+		(* event)["done"] = 1;
+	}	
 }
 
 void DynamicServerMirror::removeServer(const Server& server, MirrorServer * s)
