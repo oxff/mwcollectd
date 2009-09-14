@@ -82,12 +82,19 @@ static PyObject * mwcollectd_NetworkEndpoint_close(PyObject *self, PyObject *arg
 	Py_RETURN_NONE;
 }
 
+static PyObject * mwcollectd_NetworkEndpoint_getRecorder(PyObject *self, PyObject *args)
+{
+	return PyCObject_FromVoidPtr(((mwcollectd_NetworkEndpoint *) self)->endpoint->getStreamRecorder(), 0);
+}
+
 
 static PyMethodDef mwcollectd_NetworkEndpoint_methods[] = {
 	{ "close", mwcollectd_NetworkEndpoint_close, METH_NOARGS,
 		"Close the current connection." },
 	{ "send", mwcollectd_NetworkEndpoint_send, METH_VARARGS,
 		"Send a given byte buffer out to the network." },
+	{ "getRecorder", mwcollectd_NetworkEndpoint_getRecorder, METH_NOARGS,
+		"Obtain the opaque descriptor of the recorder associated with this endpoint." },
 	{ 0, 0, 0, 0 }
 };
 
@@ -338,12 +345,79 @@ static PyObject * mwcollectd_connect(PyObject *self, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+static PyObject * mwcollectd_dispatchEvent(PyObject *self, PyObject *args)
+{
+	const char * name;
+	PyObject * props;
+
+	if(!PyArg_ParseTuple(args, "sO!:dispatchEvent", &name, &PyDict_Type, &props))
+		return 0;
+
+	Event ev = Event(name);
+
+	{
+		Py_ssize_t pos = 0;
+		PyObject * key, * value;
+
+		while(PyDict_Next(props, &pos, &key, &value))
+		{
+			if(!PyUnicode_Check(key))
+			{
+				PyErr_SetString(PyExc_TypeError, "Key of properties dictionary is not a unicode string.");
+				return 0;
+			}
+
+			if(PyUnicode_Check(value))
+			{
+				ev[EmbedPythonModule::toString(key)] = EmbedPythonModule::toString(value);
+			}
+			else if(PyBytes_Check(value))
+			{
+				char * buffer;
+				Py_ssize_t length;
+
+				if(PyBytes_AsStringAndSize(value, &buffer, &length) < 0)
+					return 0;
+
+				ev[EmbedPythonModule::toString(key)] = string(buffer, length);
+			}
+			else if(PyLong_Check(value))
+			{
+				int overflow = 0;
+
+				ev[EmbedPythonModule::toString(key)] = PyLong_AsLongAndOverflow(value, &overflow);
+
+				if(overflow)
+					return 0;
+			}
+			else if(PyCObject_Check(value))
+			{
+				ev[EmbedPythonModule::toString(key)] = PyCObject_AsVoidPtr(value);
+			}
+			else
+			{
+				PyErr_Format(PyExc_TypeError, "Type '%s' of property '%s' is invalid.",
+					EmbedPythonModule::toString(PyObject_Type(value)).c_str(),
+					EmbedPythonModule::toString(key).c_str());
+				return 0;
+			}
+
+		}
+	}
+
+	g_daemon->getEventManager()->fireEvent(&ev);
+
+	Py_RETURN_NONE;
+}
+
 
 static PyMethodDef mwcollectdmethods[] = {
 	{ "log", mwcollectd_log, METH_VARARGS,
 		"Log given string with given log level." },
 	{ "connectStream", mwcollectd_connect, METH_VARARGS,
 		"Connect to a given IP, port via TCP." },
+	{ "dispatchEvent", mwcollectd_dispatchEvent, METH_VARARGS,
+		"Dispatch an event to the other modules." },
 	{ 0, 0, 0, 0 }
 };
 

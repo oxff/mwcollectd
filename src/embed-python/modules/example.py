@@ -17,6 +17,8 @@ def start():
 	global smb_server
 	smb_server = NetworkServer(('any', 31337), SmbConnection)
 
+	dispatchEvent('python.test', { 'foo': 'bar', 'number': 42 })
+
 	return True
 
 

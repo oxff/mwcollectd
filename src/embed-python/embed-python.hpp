@@ -174,6 +174,9 @@ public:
 	virtual void nameResolved(string name, list<string> addresses,
                 NameResolutionStatus status);
 
+	inline StreamRecorder * getStreamRecorder()
+	{ return m_recorder; }
+
 private:
 	NetworkSocket * m_socket;
 	PyObject * m_pyEndpoint;
