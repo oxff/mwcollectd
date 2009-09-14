@@ -95,7 +95,11 @@ class smbd(NetworkEndpoint):
 		
 		if p.haslayer(Raw):
 			try:
-				buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1')
+				if p.getlayer(SMB_Header).Flags2 & 0x8000: # unicode strings?
+					buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1')
+				else:
+					buffer = p.getlayer(Raw).build()
+
 				smblog.debug('Testing: {0}'.format(buffer))
 				dispatchEvent('shellcode.test', { 'buffer': buffer, 'recorder': self.getRecorder() } )
 			except UnicodeError:
@@ -323,6 +327,15 @@ class epmapper(smbd):
 		self.send(r.build())
 
 		if p.haslayer(Raw):
+			try:
+				buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1')
+			except UnicodeError:
+				buffer = p.getlayer(Raw).build()
+				pass
+
+			smblog.debug('Testing: {0}'.format(buffer))
+			dispatchEvent('shellcode.test', { 'buffer': buffer, 'recorder': self.getRecorder() } )
+
 			smblog.warning('p.haslayer(Raw): {0}'.format(p.getlayer(Raw).build()))
 #			p.show()
 
