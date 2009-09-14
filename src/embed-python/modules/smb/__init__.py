@@ -96,7 +96,7 @@ class smbd(NetworkEndpoint):
 		if p.haslayer(Raw):
 			try:
 				if p.getlayer(SMB_Header).Flags2 & 0x8000: # unicode strings?
-					buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1')
+					buffer = p.getlayer(Raw).build().decode('utf16').encode('ascii')
 				else:
 					buffer = p.getlayer(Raw).build()
 
@@ -328,7 +328,7 @@ class epmapper(smbd):
 
 		if p.haslayer(Raw):
 			try:
-				buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1')
+				buffer = p.getlayer(Raw).build().decode('utf16').encode('ascii')
 			except UnicodeError:
 				buffer = p.getlayer(Raw).build()
 				pass
