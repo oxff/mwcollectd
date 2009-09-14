@@ -95,13 +95,9 @@ class smbd(NetworkEndpoint):
 
 		smblog.debug('packet: {0}'.format(p.summary()))
 
-		if p.haslayer(Raw):
-			smblog.warning('p.haslayer(Raw): {0}'.format(p.getlayer(Raw).build()))
-#			p.show()
-
 		if len(data) < (p.LENGTH+4):
 			#we probably do not have the whole packet yet -> return 0
-			smblog.critical('=== SMB did not get enough data')
+			smblog.critical('SMB did not get enough data')
 			return 0
 
 		if p.TYPE == 0x81:
@@ -113,7 +109,7 @@ class smbd(NetworkEndpoint):
 
 		if p.haslayer(SMB_Header) and p[SMB_Header].Start != b'\xffSMB':
 			# not really SMB Header -> bail out
-			smblog.critical('=== not really SMB')
+			smblog.critical('Not really SMB')
 			self.close()
 			return len(data)
 
