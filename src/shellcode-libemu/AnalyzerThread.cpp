@@ -32,7 +32,7 @@
 
 
 
-AnalyzerThread::AnalyzerThread(list<StreamRecorder *> * queue, pthread_mutex_t * mutex,
+AnalyzerThread::AnalyzerThread(list<ShellcodeLibemuModule::TestQueueItem> * queue, pthread_mutex_t * mutex,
 	pthread_cond_t * condition, list<ShellcodeLibemuModule::Result> * resultQueue,
 	pthread_mutex_t * resultMutex)
 {
@@ -53,8 +53,8 @@ bool AnalyzerThread::spawn()
 
 void AnalyzerThread::run()
 {
+	ShellcodeLibemuModule::TestQueueItem test;
 	ShellcodeLibemuModule::Result result;
-	StreamRecorder * recorder;
 
 	sigset_t signalSet;
 	sigfillset(&signalSet);
@@ -76,13 +76,13 @@ void AnalyzerThread::run()
 				return;
 			}
 
-			recorder = m_testQueue->front();
+			test = m_testQueue->front();
 			m_testQueue->pop_front();
 			pthread_mutex_unlock(m_testQueueMutex);
 		}
 
-		result.recorder = recorder;
-		result.shellcodeOffset = checkRecorder(recorder);
+		result.test = test;
+		result.shellcodeOffset = check(test);
 
 		pthread_mutex_lock(m_resultQueueMutex);
 		m_resultQueue->push_back(result);
@@ -104,24 +104,32 @@ void AnalyzerThread::join()
 	pthread_join(m_meself, &result);
 }
 
-int AnalyzerThread::checkRecorder(StreamRecorder * recorder)
+int AnalyzerThread::check(ShellcodeLibemuModule::TestQueueItem& test)
 {
 	struct emu * e;
 	int offset;
-	recorder->acquireStreamData(recorder->DIR_INCOMING);
-	const basic_string<uint8_t>& data = recorder->getStreamData(recorder->DIR_INCOMING);
+	const basic_string<uint8_t> * data;
+
+	if(test.type == ShellcodeLibemuModule::TestQueueItem::QIT_RECORDER)
+	{
+		test.recorder->acquireStreamData(test.recorder->DIR_INCOMING);
+		data = &test.recorder->getStreamData(test.recorder->DIR_INCOMING);
+	}
+	else
+		data = &test.buffer;
 
 	if(!(e = emu_new()))
 	{
 		printf("Failed to create new libemu instance in %s!\n", __PRETTY_FUNCTION__);
-		recorder->releaseStreamData(recorder->DIR_INCOMING);
 		exit(0);
 	}
 
-	offset = emu_shellcode_test(e, (uint8_t *) data.data(), data.size());
+	offset = emu_shellcode_test(e, (uint8_t *) data->data(), data->size());
 
 	emu_free(e);
-	recorder->releaseStreamData(recorder->DIR_INCOMING);
+
+	if(test.type == ShellcodeLibemuModule::TestQueueItem::QIT_RECORDER)
+		test.recorder->releaseStreamData(test.recorder->DIR_INCOMING);
 
 	return offset;
 }

@@ -219,20 +219,49 @@ public:
 	virtual void loop();
 	virtual bool computationPending()
 	{ return !m_emulators.empty(); }
+		
+protected:
+	struct TestQueueItem
+	{
+		enum QueueItemType
+		{
+			QIT_UNITIALIZED = 0,
+			QIT_RECORDER,
+			QIT_BUFFER,
+		};
 
+		QueueItemType type;
+
+		StreamRecorder * recorder;
+		basic_string<uint8_t> buffer;
+
+		inline TestQueueItem(StreamRecorder * r)
+			: recorder(r)
+		{ type = QIT_RECORDER; }
+
+		inline TestQueueItem(StreamRecorder * r, const basic_string<uint8_t>& buf)
+			: recorder(r), buffer(buf)
+		{ type = QIT_BUFFER; }
+
+		inline TestQueueItem()
+			: type(QIT_UNITIALIZED)
+		{ }
+	};
+	
 	struct Result
 	{
-		StreamRecorder * recorder;
+		TestQueueItem test;
 		int shellcodeOffset;
 	};
 
-protected:
+	friend class AnalyzerThread;
+
 	void updateEmulatorStates();
 
 private:
 	Daemon * m_daemon;
 
-	list<StreamRecorder *> m_testQueue;
+	list<TestQueueItem> m_testQueue;
 	pthread_mutex_t m_testQueueMutex;
 	pthread_cond_t m_testCond;
 
@@ -250,7 +279,7 @@ private:
 class AnalyzerThread
 {
 public:
-	AnalyzerThread(list<StreamRecorder *> * queue, pthread_mutex_t * mutex,
+	AnalyzerThread(list<ShellcodeLibemuModule::TestQueueItem> * queue, pthread_mutex_t * mutex,
 		pthread_cond_t * condition, list<ShellcodeLibemuModule::Result> *
 		resultQueue, pthread_mutex_t * m_resultMutex);
 
@@ -263,10 +292,10 @@ protected:
 	{ ((AnalyzerThread *) instance)->run(); return 0; }
 	void run();
 
-	int checkRecorder(StreamRecorder * recorder);
+	int check(ShellcodeLibemuModule::TestQueueItem& test);
 
 private:
-	list<StreamRecorder *> * m_testQueue;
+	list<ShellcodeLibemuModule::TestQueueItem> * m_testQueue;
 	pthread_mutex_t * m_testQueueMutex;
 	pthread_cond_t * m_testAvailable;
 	pthread_t m_meself;

@@ -75,8 +75,11 @@ bool ShellcodeLibemuModule::start(Configuration * config)
 		m_threads.push_back(t);
 	}
 
-	if(!m_daemon->getEventManager()->subscribeEventMask("stream.finished", this))
+	if(!m_daemon->getEventManager()->subscribeEventMask("stream.finished", this)
+		|| !m_daemon->getEventManager()->subscribeEventMask("shellcode.test", this))
+	{
 		return false;
+	}
 
 	m_daemon->registerLoopable(this);
 
@@ -116,6 +119,9 @@ bool ShellcodeLibemuModule::stop()
 
 	m_daemon->unregisterLoopable(this);
 
+	m_daemon->getEventManager()->unsubscribeEventMask("stream.finished", this);
+	m_daemon->getEventManager()->unsubscribeEventMask("shellcode.test", this);
+
 	return true;
 }
 
@@ -126,13 +132,26 @@ void ShellcodeLibemuModule::handleEvent(Event * ev)
 
 	if(ev->getName() == "stream.finished")
 	{
-		StreamRecorder * recorder = (StreamRecorder *)
-			(* ev)["recorder"].getPointerValue();
+		StreamRecorder * recorder = (StreamRecorder *) (* ev)["recorder"].getPointerValue();
 
 		recorder->acquire();
 
 		pthread_mutex_lock(&m_testQueueMutex);
-		m_testQueue.push_back(recorder);
+		m_testQueue.push_back(TestQueueItem(recorder));
+		pthread_mutex_unlock(&m_testQueueMutex);
+		pthread_cond_signal(&m_testCond);
+	}
+	else if(ev->getName() == "shellcode.test")
+	{
+		string source = * (* ev)["buffer"];
+		basic_string<uint8_t> buffer;
+		StreamRecorder * recorder = (StreamRecorder *) (* ev)["recorder"].getPointerValue();
+
+		copy(source.begin(), source.end(), buffer.begin());
+		recorder->acquire();
+
+		pthread_mutex_lock(&m_testQueueMutex);
+		m_testQueue.push_back(TestQueueItem(recorder, buffer));
 		pthread_mutex_unlock(&m_testQueueMutex);
 		pthread_cond_signal(&m_testCond);
 	}
@@ -179,36 +198,44 @@ void ShellcodeLibemuModule::loop()
 			{
 				char offsetString[10];
 
-				Event ev = Event("shellcode.detected");
-				ev["recorder"] = (void *) result.recorder;
-				m_daemon->getEventManager()->fireEvent(&ev);
+				if(result.test.type == TestQueueItem::QIT_RECORDER)
+				{
+					snprintf(offsetString, sizeof(offsetString) - 1, "%x",
+						result.shellcodeOffset);
+					result.test.recorder->setProperty("shellcode.offset", offsetString);
+				}
+				else
+					strcpy(offsetString, "<buffer>");
 
-				snprintf(offsetString, sizeof(offsetString) - 1, "%x",
-					result.shellcodeOffset);
-				result.recorder->setProperty("shellcode.offset", offsetString);
+				Event ev = Event("shellcode.detected");
+				ev["recorder"] = (void *) result.test.recorder;
+				m_daemon->getEventManager()->fireEvent(&ev);
 			}
 
 			{
-				result.recorder->acquireStreamData(StreamRecorder::DIR_INCOMING);
-				const basic_string<uint8_t>& stream =
-					result.recorder->getStreamData(StreamRecorder::DIR_INCOMING);
+				const basic_string<uint8_t> * stream;
 
-				EmulatorSession * emu = new EmulatorSession(stream.data(),
-					stream.size(), result.shellcodeOffset, m_daemon,
-					result.recorder);
+				if(result.test.type == TestQueueItem::QIT_RECORDER)
+				{
+					result.test.recorder->acquireStreamData(StreamRecorder::DIR_INCOMING);
+					stream = &result.test.recorder->getStreamData(StreamRecorder::DIR_INCOMING);
+				}
+				else
+					stream = &result.test.buffer;
+
+				EmulatorSession * emu = new EmulatorSession(stream->data(),
+					stream->size(), result.shellcodeOffset, m_daemon,
+					result.test.recorder);
 				m_emulators.push_back(emu);
 
-				result.recorder->releaseStreamData(StreamRecorder::DIR_INCOMING);
-				result.recorder->release();
+				if(result.test.type == TestQueueItem::QIT_RECORDER)
+					result.test.recorder->releaseStreamData(StreamRecorder::DIR_INCOMING);
 			}
 		}
 		else
-		{
-			LOG(L_SPAM, "Stream with recorder %p did not contain shellcode.",
-				result.recorder);
-
-			result.recorder->release();
-		}
+			LOG(L_SPAM, "No shellcode for recorder %p.", result.test.recorder);
+		
+		result.test.recorder->release();
 	}
 }
 
