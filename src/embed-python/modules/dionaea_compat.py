@@ -5,13 +5,13 @@ class Logger(object):
 		self.prefix = prefix
 
 	def debug(self, msg, *args, ** kwargs):
-		log(L_SPAM, msg % args)
+		log(L_SPAM, '[Py/' + prefix + '] ' + (msg % args))
 
 	def warning(self, msg, *args, ** kwargs):
-		log(L_INFO, msg % args)
+		log(L_INFO, '[Py/' + prefix + '] ' + (msg % args))
 
 	def info(self, msg, *args, ** kwargs):
-		log(L_INFO, msg % args)
+		log(L_INFO, '[Py/' + prefix + '] ' + (msg % args))
 	
 	def critical(self, msg, *args, ** kwargs):
-		log(L_CRIT, msg % args)
+		log(L_CRIT, '[Py/' + prefix + '] ' + (msg % args))

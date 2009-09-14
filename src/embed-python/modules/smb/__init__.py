@@ -94,6 +94,9 @@ class smbd(NetworkEndpoint):
 			return len(data)
 
 		smblog.debug('packet: {0}'.format(p.summary()))
+		
+		if p.haslayer(Raw):
+			smblog.warning('Raw Layer: {0}'.format(p.getlayer(Raw).build()))
 
 		if len(data) < (p.LENGTH+4):
 			#we probably do not have the whole packet yet -> return 0
