@@ -85,23 +85,23 @@ class smbd(NetworkEndpoint):
 
 
 	def dataRead(self,data):
-
-		try:
-			p = NBTSession(data)
-		except:
-			t = traceback.format_exc()
-			smblog.critical(t)
-			return len(data)
-
-		smblog.debug('packet: {0}'.format(p.summary()))
+		p = NBTSession(data)
+		smblog.debug(p.summary())
 		
-		if p.haslayer(Raw):
-			smblog.warning('Raw Layer: {0}'.format(p.getlayer(Raw).build()))
-
 		if len(data) < (p.LENGTH+4):
 			#we probably do not have the whole packet yet -> return 0
 			smblog.critical('SMB did not get enough data')
 			return 0
+		
+		if p.haslayer(Raw):
+			try:
+				buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1')
+				smblog.debug('Testing: {0}'.format(buffer))
+				dispatchEvent('shellcode.test', { 'buffer': buffer, 'recorder': self.getRecorder() } )
+			except UnicodeError:
+				pass
+
+			smblog.warning('Raw Layer: {0}'.format(p.getlayer(Raw).build()))
 
 		if p.TYPE == 0x81:
 			self.send(NBTSession(TYPE=0x82).build())
