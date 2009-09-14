@@ -1,8 +1,8 @@
 from mwcollectd import *
 
 class Logger(object):
-	def __init__(self, self.prefix):
-		self.prefix = self.prefix
+	def __init__(self, prefix):
+		self.prefix = prefix
 
 	def debug(self, msg, *args, ** kwargs):
 		log(L_SPAM, '[Py/' + self.prefix + '] ' + (msg % args))
