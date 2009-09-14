@@ -200,15 +200,29 @@ void DynamicPythonEndpointFactory::timeoutFired(Timeout timeout)
 	if(timeout != m_timeout)
 		return;
 
-	GLOG(L_SPAM, "%s [%s, %hu]", __PRETTY_FUNCTION__, m_address.c_str(), m_port);
+	m_timeout = TIMEOUT_EMPTY;
+
+	if(refs() == 1)
+		g_module->deregisterFactory(m_address, m_port, this);
+
 	decref();
 }
 
 NetworkEndpoint * DynamicPythonEndpointFactory::createEndpoint(NetworkSocket * clientSocket)
 {
-	g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
-	m_timeout = g_daemon->getTimeoutManager()->scheduleTimeout(30, this);
-
+	if(m_timeout != TIMEOUT_EMPTY)
+	{
+		g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
+		m_timeout = g_daemon->getTimeoutManager()->scheduleTimeout(30, this);
+	}
+	
 	return PythonEndpointFactory::createEndpoint(clientSocket);
+}
+void DynamicPythonEndpointFactory::destroyEndpoint(NetworkEndpoint * endpoint)
+{
+	if(refs() == 1)
+		g_module->deregisterFactory(m_address, m_port, this);
+
+	return PythonEndpointFactory::destroyEndpoint(endpoint);
 }
 

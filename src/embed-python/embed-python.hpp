@@ -210,6 +210,9 @@ public:
 			delete this;
 	}
 
+	inline size_t refs()
+	{ return m_refCount; }
+
 private:
 	PyTypeObject * m_endpointType;
 	size_t m_refCount;
@@ -225,10 +228,8 @@ public:
 		m_port = port;
 	}
 
-	virtual ~DynamicPythonEndpointFactory()
-	{ g_module->deregisterFactory(m_address, m_port, this); }
-
 	virtual NetworkEndpoint * createEndpoint(NetworkSocket * clientSocket);
+	virtual void destroyEndpoint(NetworkEndpoint * endpoint);
 
 	virtual void timeoutFired(Timeout timeout);
 	inline void setTimeout(Timeout t)
