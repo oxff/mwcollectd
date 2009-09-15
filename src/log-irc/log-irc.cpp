@@ -632,7 +632,7 @@ void IrcConnection::logMessage(LogManager::LogLevel level, const char * message)
 			line += msg.substr(off, off + k) + suffix;
 
 			if(!off)
-				k += 4;
+				k -= 4;
 
 			m_socket->send(line.data(), line.size());
 			off += k;
