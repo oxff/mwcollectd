@@ -143,15 +143,12 @@ void ShellcodeLibemuModule::handleEvent(Event * ev)
 	}
 	else if(ev->getName() == "shellcode.test")
 	{
-		string source = * (* ev)["buffer"];
-		basic_string<uint8_t> buffer;
 		StreamRecorder * recorder = (StreamRecorder *) (* ev)["recorder"].getPointerValue();
 
-		copy(source.begin(), source.end(), buffer.begin());
 		recorder->acquire();
 
 		pthread_mutex_lock(&m_testQueueMutex);
-		m_testQueue.push_back(TestQueueItem(recorder, buffer));
+		m_testQueue.push_back(TestQueueItem(recorder, * (* ev)["buffer"]));
 		pthread_mutex_unlock(&m_testQueueMutex);
 		pthread_cond_signal(&m_testCond);
 	}
@@ -213,19 +210,25 @@ void ShellcodeLibemuModule::loop()
 			}
 
 			{
-				const basic_string<uint8_t> * stream;
+				EmulatorSession * emu;
 
 				if(result.test.type == TestQueueItem::QIT_RECORDER)
 				{
 					result.test.recorder->acquireStreamData(StreamRecorder::DIR_INCOMING);
-					stream = &result.test.recorder->getStreamData(StreamRecorder::DIR_INCOMING);
+					const basic_string<uint8_t>& stream =
+						result.test.recorder->getStreamData(StreamRecorder::DIR_INCOMING);
+					emu = new EmulatorSession(stream.data(),
+						stream.size(), result.shellcodeOffset, m_daemon,
+						result.test.recorder);
+					
 				}
 				else
-					stream = &result.test.buffer;
+				{
+					emu = new EmulatorSession((uint8_t *) result.test.buffer.data(),
+						result.test.buffer.size(), result.shellcodeOffset, m_daemon,
+						result.test.recorder);
+				}
 
-				EmulatorSession * emu = new EmulatorSession(stream->data(),
-					stream->size(), result.shellcodeOffset, m_daemon,
-					result.test.recorder);
 				m_emulators.push_back(emu);
 
 				if(result.test.type == TestQueueItem::QIT_RECORDER)
