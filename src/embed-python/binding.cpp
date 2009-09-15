@@ -27,6 +27,93 @@
  */
 
 #include "embed-python.hpp"
+#include <structmember.h>
+
+
+
+
+void mwcollectd_NetworkEndpointTimeouts_dealloc(mwcollectd_NetworkEndpointTimeouts * self)
+{
+	Py_TYPE((PyObject *) self)->tp_free(self);
+}
+
+static PyObject * mwcollectd_NetworkEndpointTimeouts_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyErr_SetString(PyExc_RuntimeError, "This type may not be directly instantiated from python.");
+	return 0;
+}
+
+
+#define SETATTR_CHECK_INIT() \
+	if(!self->endpoint) \
+	{ \
+		PyErr_SetString(PyExc_AttributeError, "Network endpoint timeout set before connection was established."); \
+		return -1; \
+	}
+
+int mwcollectd_NetworkEndpointTimeouts_setattr(mwcollectd_NetworkEndpointTimeouts * self, char * name, PyObject * value)
+{
+	PyObject * attrname = PyUnicode_FromString(name);
+	int result =  PyObject_GenericSetAttr((PyObject *) self, attrname, value);
+	Py_XDECREF(attrname);
+
+	if(result < 0)
+		return result;
+
+	if(!strcmp(name, "sustain"))
+	{
+		SETATTR_CHECK_INIT();
+
+		if(self->tSustain != TIMEOUT_EMPTY)
+			g_daemon->getTimeoutManager()->dropTimeout(self->tSustain);
+
+		if(self->sustain > 0)
+			self->tSustain = g_daemon->getTimeoutManager()->scheduleTimeout(self->sustain, self->endpoint);
+	}
+
+	if(!strcmp(name, "kill"))
+	{
+		SETATTR_CHECK_INIT();
+
+		if(self->tKill != TIMEOUT_EMPTY)
+			g_daemon->getTimeoutManager()->dropTimeout(self->tKill);
+
+		if(self->kill > 0)
+			self->tKill = g_daemon->getTimeoutManager()->scheduleTimeout(self->kill, self->endpoint);
+	}
+
+	return result;
+}
+
+#undef SETATTR_CHECK_INIT
+
+
+
+static PyMemberDef mwcollectd_NetworkEndpointTimeouts_members[] = {
+	{ (char *) "sustain", T_LONG, offsetof(mwcollectd_NetworkEndpointTimeouts, sustain), 0,
+		(char *) "Timeout in seconds before an idle connection is closed (sending does not count as activity)." },
+	{ (char *) "kill", T_LONG, offsetof(mwcollectd_NetworkEndpointTimeouts, kill), 0,
+		(char *) "Timeout in seconds after which this connection is killed effectively." },
+	{ 0, 0, 0, 0, 0 }
+};
+
+static PyTypeObject mwcollectd_NetworkEndpointTimeoutsType = {
+	PyObject_HEAD_INIT(NULL)
+	"mwcollectd.NetworkEndpointTimeouts",
+	sizeof(mwcollectd_NetworkEndpointTimeouts),
+	0,
+	(void (*) (PyObject *)) mwcollectd_NetworkEndpointTimeouts_dealloc,
+	0, 0,
+	(int (*) (PyObject *, char *, PyObject *)) mwcollectd_NetworkEndpointTimeouts_setattr, 
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	Py_TPFLAGS_DEFAULT,
+	"Network timeouts for an endpoint.",
+	0, 0, 0, 0, 0, 0,
+	0, // methods
+	mwcollectd_NetworkEndpointTimeouts_members,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	mwcollectd_NetworkEndpointTimeouts_new
+};
 
 
 
@@ -38,6 +125,13 @@ static PyObject * mwcollectd_NetworkEndpoint_new(PyTypeObject *type, PyObject *a
 		return 0;
 
 	self->endpoint = 0;
+	self->timeouts = PyObject_New(mwcollectd_NetworkEndpointTimeouts, &mwcollectd_NetworkEndpointTimeoutsType);
+	self->timeouts->endpoint =  0;
+
+	self->timeouts->sustain = 0;
+	self->timeouts->tSustain = TIMEOUT_EMPTY;
+	self->timeouts->kill = 0;
+	self->timeouts->tKill = TIMEOUT_EMPTY;
 
 	return (PyObject *) self;
 }
@@ -46,6 +140,14 @@ static void mwcollectd_NetworkEndpoint_dealloc(mwcollectd_NetworkEndpoint * self
 {
 	if(self->endpoint)
 		delete self->endpoint;
+
+	if(self->timeouts->tSustain != TIMEOUT_EMPTY)
+		g_daemon->getTimeoutManager()->dropTimeout(self->timeouts->tSustain);
+
+	if(self->timeouts->tKill != TIMEOUT_EMPTY)
+		g_daemon->getTimeoutManager()->dropTimeout(self->timeouts->tKill);
+	
+	Py_TYPE((PyObject *) self->timeouts)->tp_free(self->timeouts);
 
 	Py_TYPE((PyObject *) self)->tp_free(self);
 }
@@ -98,6 +200,11 @@ static PyMethodDef mwcollectd_NetworkEndpoint_methods[] = {
 	{ 0, 0, 0, 0 }
 };
 
+static PyMemberDef mwcollectd_NetworkEndpoint_members[] = {
+	{ (char *) "timeouts", T_OBJECT_EX, offsetof(mwcollectd_NetworkEndpoint, timeouts), READONLY, (char *) "Network timeouts." },
+	{ 0, 0, 0, 0, 0 }
+};
+
 static PyTypeObject mwcollectd_NetworkEndpointType = {
 	PyObject_HEAD_INIT(NULL)
 	"mwcollectd.NetworkEndpoint",
@@ -109,7 +216,8 @@ static PyTypeObject mwcollectd_NetworkEndpointType = {
 	"Network endpoint of a connection, receiving and sending data.",
 	0, 0, 0, 0, 0, 0,
 	mwcollectd_NetworkEndpoint_methods,
-	0, 0, 0, 0, 0, 0, 0, 0, 0,
+	mwcollectd_NetworkEndpoint_members,
+	0, 0, 0, 0, 0, 0, 0, 0,
 	mwcollectd_NetworkEndpoint_new
 };
 
@@ -411,6 +519,7 @@ static PyObject * mwcollectd_dispatchEvent(PyObject *self, PyObject *args)
 }
 
 
+
 static PyMethodDef mwcollectdmethods[] = {
 	{ "log", mwcollectd_log, METH_VARARGS,
 		"Log given string with given log level." },
@@ -435,8 +544,11 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 {
 	PyObject * module;
 
-	if(PyType_Ready(&mwcollectd_NetworkEndpointType) < 0 || PyType_Ready(&mwcollectd_NetworkServerType) < 0)
+	if(PyType_Ready(&mwcollectd_NetworkEndpointTimeoutsType) < 0
+		|| PyType_Ready(&mwcollectd_NetworkEndpointType) < 0 || PyType_Ready(&mwcollectd_NetworkServerType) < 0)
+	{
 		return 0;
+	}
 
 	if(!(module = PyModule_Create(&mwcollectdmodule)))
 		return 0;
@@ -447,6 +559,9 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 	PyModule_AddIntConstant(module, "L_CRIT", (long) L_CRIT);
 
 	PyModule_AddStringConstant(module, "version", g_daemon->getVersion());
+
+	Py_INCREF(&mwcollectd_NetworkEndpointTimeoutsType);
+	PyModule_AddObject(module, "NetworkEndpointTimeouts", (PyObject *) &mwcollectd_NetworkEndpointTimeoutsType);
 
 	Py_INCREF(&mwcollectd_NetworkEndpointType);
 	PyModule_AddObject(module, "NetworkEndpoint", (PyObject *) &mwcollectd_NetworkEndpointType);

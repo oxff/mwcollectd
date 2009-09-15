@@ -134,7 +134,7 @@ extern EmbedPythonModule * g_module;
 extern Daemon * g_daemon;
 
 
-class PythonEndpoint : public NetworkEndpoint, public NameResolver
+class PythonEndpoint : public NetworkEndpoint, public NameResolver, public TimeoutReceiver
 {
 public:
 	PythonEndpoint(PyObject * endpoint)
@@ -146,6 +146,8 @@ public:
 
 	virtual void connectionEstablished(NetworkNode * remoteNode, NetworkNode * localNode);
 	virtual void connectionClosed();
+
+	virtual void timeoutFired(Timeout t);
 
 #if 0
 	virtual void dataSent(uint32_t length);
@@ -186,10 +188,18 @@ private:
 	uint16_t m_cachePort;
 };
 
+typedef struct {
+	PyObject_HEAD
+	PythonEndpoint * endpoint;
+
+	long sustain, kill;
+	Timeout tSustain, tKill;
+} mwcollectd_NetworkEndpointTimeouts;
 
 typedef struct {
 	PyObject_HEAD
 	PythonEndpoint * endpoint;
+	mwcollectd_NetworkEndpointTimeouts * timeouts;
 } mwcollectd_NetworkEndpoint;
 
 

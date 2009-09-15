@@ -78,10 +78,7 @@ class smbd(NetworkEndpoint):
 		self.last_flags2 = 0
 
 	def connectionEstablished(self):
-#		self.timeouts.sustain = 60
-#		self._in.accounting.limit  = 100*1024
-#		self._out.accounting.limit = 100*1024
-#		self.processors()
+		self.timeouts.sustain = 60
 		pass
 
 
