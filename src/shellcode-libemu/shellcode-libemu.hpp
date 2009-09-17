@@ -233,13 +233,13 @@ protected:
 		QueueItemType type;
 
 		StreamRecorder * recorder;
-		basic_string<uint8_t> buffer;
+		string buffer;
 
 		inline TestQueueItem(StreamRecorder * r)
 			: recorder(r)
 		{ type = QIT_RECORDER; }
 
-		inline TestQueueItem(StreamRecorder * r, const basic_string<uint8_t>& buf)
+		inline TestQueueItem(StreamRecorder * r, const string& buf)
 			: recorder(r), buffer(buf)
 		{ type = QIT_BUFFER; }
 

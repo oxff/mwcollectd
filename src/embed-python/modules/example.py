@@ -1,10 +1,12 @@
 from mwcollectd import *
+import mwcollectd
 import sys
 import struct
 
 class SmbConnection(NetworkEndpoint):
 	def connectionEstablished(self):
-		log(L_INFO, 'New connection...')
+		self.timeouts.sustain = 5
+		log(L_INFO, 'New connection, timeout after %is idle time.' % self.timeouts.sustain)
 
 	def connectionClosed(self):
 		log(L_INFO, 'Connection has been closed.')
@@ -14,8 +16,10 @@ class SmbConnection(NetworkEndpoint):
 
 
 def start():
+	log(L_INFO, mwcollectd.version)
+
 	global smb_server
-	smb_server = NetworkServer(('any', 31337), SmbConnection)
+	smb_server = NetworkServer(('any', 1337), SmbConnection)
 
 	dispatchEvent('python.test', { 'foo': 'bar', 'number': 42 })
 

@@ -108,28 +108,36 @@ int AnalyzerThread::check(ShellcodeLibemuModule::TestQueueItem& test)
 {
 	struct emu * e;
 	int offset;
-	const basic_string<uint8_t> * data;
 
 	if(test.type == ShellcodeLibemuModule::TestQueueItem::QIT_RECORDER)
 	{
 		test.recorder->acquireStreamData(test.recorder->DIR_INCOMING);
-		data = &test.recorder->getStreamData(test.recorder->DIR_INCOMING);
+		const basic_string<uint8_t>& data = test.recorder->getStreamData(test.recorder->DIR_INCOMING);
+	
+		if(!(e = emu_new()))
+		{
+			printf("Failed to create new libemu instance in %s!\n", __PRETTY_FUNCTION__);
+			exit(0);
+		}
+
+		offset = emu_shellcode_test(e, (uint8_t *) data.data(), data.size());
+
+		emu_free(e);
+		
+		test.recorder->releaseStreamData(test.recorder->DIR_INCOMING);
 	}
 	else
-		data = &test.buffer;
-
-	if(!(e = emu_new()))
 	{
-		printf("Failed to create new libemu instance in %s!\n", __PRETTY_FUNCTION__);
-		exit(0);
+		if(!(e = emu_new()))
+		{
+			printf("Failed to create new libemu instance in %s!\n", __PRETTY_FUNCTION__);
+			exit(0);
+		}
+
+		offset = emu_shellcode_test(e, (uint8_t *)test.buffer.data(), test.buffer.size());
+
+		emu_free(e);
 	}
-
-	offset = emu_shellcode_test(e, (uint8_t *) data->data(), data->size());
-
-	emu_free(e);
-
-	if(test.type == ShellcodeLibemuModule::TestQueueItem::QIT_RECORDER)
-		test.recorder->releaseStreamData(test.recorder->DIR_INCOMING);
 
 	return offset;
 }

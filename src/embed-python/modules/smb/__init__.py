@@ -75,37 +75,35 @@ class smbd(NetworkEndpoint):
 		}
 		self.buf = b''
 		self.outbuf = None
+		self.last_flags2 = 0
 
 	def connectionEstablished(self):
-#		self.timeouts.sustain = 60
-#		self._in.accounting.limit  = 100*1024
-#		self._out.accounting.limit = 100*1024
-#		self.processors()
+		self.timeouts.sustain = 60
 		pass
 
 
 	def dataRead(self,data):
 		p = NBTSession(data)
 		smblog.debug(p.summary())
+
+		if p.haslayer(Raw):
+			if self.last_flags2 & 0x8000: # unicode strings?
+				buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1', 'ignore')
+			else:
+				buffer = p.getlayer(Raw).build()
+
+			smblog.debug('Testing: {0}'.format(buffer))
+			dispatchEvent('shellcode.test', { 'buffer': buffer, 'recorder': self.getRecorder() } )
+
+			smblog.warning('Raw Layer: {0}'.format(p.getlayer(Raw).build()))
 		
 		if len(data) < (p.LENGTH+4):
 			#we probably do not have the whole packet yet -> return 0
-			smblog.critical('SMB did not get enough data')
+			smblog.debug('SMB did not get enough data, buffering...')
 			return 0
-		
-		if p.haslayer(Raw):
-			try:
-				if p.getlayer(SMB_Header).Flags2 & 0x8000: # unicode strings?
-					buffer = p.getlayer(Raw).build().decode('utf16').encode('ascii')
-				else:
-					buffer = p.getlayer(Raw).build()
 
-				smblog.debug('Testing: {0}'.format(buffer))
-				dispatchEvent('shellcode.test', { 'buffer': buffer, 'recorder': self.getRecorder() } )
-			except UnicodeError:
-				pass
-
-			smblog.warning('Raw Layer: {0}'.format(p.getlayer(Raw).build()))
+		if p.haslayer(SMB_Header):
+			self.last_flags2 = p.getlayer(SMB_Header).Flags2
 
 		if p.TYPE == 0x81:
 			self.send(NBTSession(TYPE=0x82).build())
@@ -328,7 +326,7 @@ class epmapper(smbd):
 
 		if p.haslayer(Raw):
 			try:
-				buffer = p.getlayer(Raw).build().decode('utf16').encode('ascii')
+				buffer = p.getlayer(Raw).build().decode('utf16').encode('latin1', 'ignore')
 			except UnicodeError:
 				buffer = p.getlayer(Raw).build()
 				pass

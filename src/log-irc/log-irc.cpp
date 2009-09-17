@@ -614,10 +614,29 @@ void IrcConnection::logMessage(LogManager::LogLevel level, const char * message)
 		"\x35\x02",
 	};
 
+	string msg = message;
+
 	if(m_connected) {
-		string line = "PRIVMSG " + m_configuration->channel + " :\x03" +
-			colours[level] + message + "\x03\r\n";
-		m_socket->send(line.data(), line.size());
+		string prefix = "PRIVMSG " + m_configuration->channel + " :\x03" +
+			colours[level];
+		string suffix = "\x03\r\n";
+		string::size_type off = 0, size = msg.size(), k = (512 - prefix.size() - suffix.size());
+
+		while(off < size)
+		{
+			string line = prefix;
+
+			if(off)
+				line += "\xe2\x80\xa6 ";
+			
+			line += msg.substr(off, off + k) + suffix;
+
+			if(!off)
+				k -= 4;
+
+			m_socket->send(line.data(), line.size());
+			off += k;
+		}
 	}
 }
 
