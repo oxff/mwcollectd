@@ -316,8 +316,12 @@ void EmulatorSession::createProcess(const char * image, const char * commandline
 	Event ev = Event("shellcode.process");
 
 	ev["recorder"] = (void *) m_recorder;
-	ev["image"] = image;
-	ev["commandline"] = commandline;
+
+	if(image)
+		ev["image"] = image;
+
+	if(commandline)
+		ev["commandline"] = commandline;
 
 	m_daemon->getEventManager()->fireEvent(&ev);
 }
