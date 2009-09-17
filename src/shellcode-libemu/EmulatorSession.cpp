@@ -275,12 +275,12 @@ bool EmulatorSession::appendFile(uint32_t handle, uint8_t * buffer, uint32_t len
 {
 	unordered_map<uint32_t, VirtualFile>::iterator it = m_files.find(handle);
 
-	LOG(L_SPAM, "%s: %u", __PRETTY_FUNCTION__, length);
+	LOG(L_SPAM, "%s: %p, %u", __PRETTY_FUNCTION__, m_recorder, length);
 
 	if(it == m_files.end())
 		return false;
 
-	it->second.contents.append(buffer, length);
+	it->second.contents.append((char *) buffer, length);
 	it->second.off += length;
 
 	return true;
@@ -293,14 +293,32 @@ void EmulatorSession::closeHandle(uint32_t handle)
 	if(it == m_files.end())
 		return;
 
-	LOG(L_SPAM, "%p wrote \"%s\" with contents \"%s\".", m_recorder,
-		it->second.name.c_str(), it->second.contents.c_str());
+	LOG(L_SPAM, "%p wrote \"%s\", %u bytes.", m_recorder,
+		it->second.name.c_str(), it->second.contents.size());
+
+	m_recorder->setProperty(("content:" + it->second.name).c_str(), it->second.contents);
+
+	{
+		Event ev = Event("shellcode.newfile");
+
+		ev["recorder"] = (void *) m_recorder;
+		ev["name"] = it->second.name;
+
+		m_daemon->getEventManager()->fireEvent(&ev);
+	}
+
 	m_files.erase(it);
 }
 
 
 void EmulatorSession::createProcess(const char * image, const char * commandline)
 {
-	LOG(L_SPAM, "Shellcode for recorder %p creates process of \"%s\".", image);
+	Event ev = Event("shellcode.process");
+
+	ev["recorder"] = (void *) m_recorder;
+	ev["image"] = image;
+	ev["commandline"] = commandline;
+
+	m_daemon->getEventManager()->fireEvent(&ev);
 }
 

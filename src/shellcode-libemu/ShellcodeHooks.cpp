@@ -105,7 +105,7 @@ uint32_t hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...)
 	va_start(vl, hook);
 
 	int fd = va_arg(vl, int);
-	/*struct sockaddr_in * addr = */ (void) va_arg(vl, struct sockaddr_in *);
+	struct sockaddr_in * addr = va_arg(vl, struct sockaddr_in *);
 	uint32_t namelen = va_arg(vl, uint32_t);
 
 	((EmulatorSession *) hook->hook.win->userdata)->resetStepCounter();
@@ -115,8 +115,8 @@ uint32_t hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...)
 	if(!socket || namelen < 8)
 		return (uint32_t) -1;
 
-	// int res = socket->connect(addr->sin_addr.s_addr, addr->sin_port);
-	int res = socket->connect(0x0100007f, htons(4711));
+	int res = socket->connect(addr->sin_addr.s_addr, addr->sin_port);
+	// int res = socket->connect(0x0100007f, htons(4711));
 	
 	if(res == -2)
 	{

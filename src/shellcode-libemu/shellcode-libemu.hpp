@@ -185,7 +185,7 @@ private:
 		{ off = 0; }
 
 		string name;
-		basic_string<uint8_t> contents;
+		string contents;
 		uint32_t off;
 	};
 
