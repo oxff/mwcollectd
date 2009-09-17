@@ -330,7 +330,7 @@ uint32_t hook_WinExec(struct emu_env *env, struct emu_env_hook *hook, ...)
 
 	char * cmdline = va_arg(vl, char *);
 
-	((EmulatorSession *) hook->hook.win->userdata)->createProcess(cmdline, cmdline);
+	((EmulatorSession *) hook->hook.win->userdata)->createProcess(0, cmdline);
 
 	va_end(vl);
 	return 0;

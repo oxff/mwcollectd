@@ -100,7 +100,7 @@ void EmulatorSession::registerHooks()
 	emu_env_w32_export_hook(m_env, "CloseHandle", schooks::hook_CloseHandle, this);
 
 	emu_env_w32_export_hook(m_env, "CreateProcessA", schooks::hook_CreateProcess, this);
-	emu_env_w32_export_hook(m_env, "WinExec", schooks::hook_CreateProcess, this);
+	emu_env_w32_export_hook(m_env, "WinExec", schooks::hook_WinExec, this);
 	emu_env_w32_export_hook(m_env, "ExitProcess", schooks::hook_ExitProcess, this);
 	emu_env_w32_export_hook(m_env, "ExitThread", schooks::hook_ExitThread, this);
 
