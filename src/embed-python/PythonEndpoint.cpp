@@ -180,7 +180,10 @@ void PythonEndpoint::timeoutFired(Timeout t)
 	}
 	else if(t == ((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tKill)
 	{
-		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->sustain = -1;
+		GLOG(L_CRIT, "%s: %p, %p, %p", __PRETTY_FUNCTION__, m_socket, t,
+				((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tKill);
+
+		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->kill = -1;
 		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tKill = TIMEOUT_EMPTY;
 
 		m_socket->close(true);
