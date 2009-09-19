@@ -51,7 +51,10 @@ bool FileStoreStreamsModule::start(Configuration * moduleConfiguration)
 {
 	struct stat dir;
 
-	m_directory = moduleConfiguration->getString(":directory", "/var/log/mwcollectd/attacks/");
+	m_directory = PREFIX "/var/log/mwcollectd/attacks/";
+
+	if(moduleConfiguration)
+		moduleConfiguration->getString(":directory", m_directory.c_str());
 
 	if(stat(m_directory.c_str(), &dir) < 0 || !(dir.st_mode & S_IFDIR))
 	{
