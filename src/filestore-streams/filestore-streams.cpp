@@ -122,7 +122,7 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 
 bool FileStoreStreamsModule::stop()
 {
-	m_daemon->getEventManager()->unsubscribeEventMask("stram.finished", this);
+	m_daemon->getEventManager()->unsubscribeEventMask("stream.finished", this);
 	return true;
 }
 
