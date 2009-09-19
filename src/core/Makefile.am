@@ -8,5 +8,9 @@ AM_CPPFLAGS = -DMWCOLLECTD_CORE -I../include/ -Wall -Werror -Wno-deprecated
 
 sbin_PROGRAMS  = mwcollectd
 
+mwcollectd_LDFLAGS = $(LIBCRYPTO_LDFLAGS)
+mwcollectd_CXXFLAGS = $(LIBCRYPTO_CXXFLAGS)
+
 mwcollectd_SOURCES  = mwcollectd.cpp
 mwcollectd_SOURCES += Daemon.cpp
+mwcollectd_SOURCES += HashManager.cpp

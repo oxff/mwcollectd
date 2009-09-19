@@ -29,6 +29,8 @@
 #include <libnetworkd/libnetworkd.hpp>
 using namespace libnetworkd;
 
+#include "HashManager.hpp"
+
 #include <list>
 
 #ifndef __MWCOLLECTD_DAEMON_HPP
@@ -92,6 +94,8 @@ public:
 	{ return &m_EventManager; }
 	inline TimeoutManager * getTimeoutManager()
 	{ return &m_TimeoutManager; }
+	inline HashManager * getHashManager()
+	{ return &m_HashManager; }
 
 	inline void stop()
 	{ m_active = false; }
@@ -112,6 +116,7 @@ private:
 	TimeoutManager m_TimeoutManager;
 	EventManager m_EventManager;
 	LogManager m_LogManager;
+	HashManager m_HashManager;
 
 	bool m_active;	
 	string m_configBasepath;
