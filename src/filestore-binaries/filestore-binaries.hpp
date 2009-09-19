@@ -27,31 +27,37 @@
  */
 
 
-#ifndef __MWCOLLECTD_FILESTORESTREAMS_HPP
-#define __MWCOLLECTD_FILESTORESTREAMS_HPP
+#ifndef __MWCOLLECTD_FILESTOREBINARIES_HPP
+#define __MWCOLLECTD_FILESTOREBINARIES_HPP
 
 #include <mwcollectd.hpp>
 using namespace mwcollectd;
 
-class FileStoreStreamsModule : public Module, public EventSubscriber
+class FileStoreBinariesModule : public Module, public EventSubscriber, public HashReceiver
 {
 public:
-	FileStoreStreamsModule(Daemon * daemon);
-	virtual ~FileStoreStreamsModule() { }
+	FileStoreBinariesModule(Daemon * daemon);
+	virtual ~FileStoreBinariesModule() { }
 
 	virtual bool start(Configuration * moduleConfiguration);
 	virtual bool stop();
 
-	virtual const char * getName() { return "filestore-streams"; }
-	virtual const char * getDescription() { return "Save attack stream "
-		"data in your local filesystem."; }
+	virtual const char * getName() { return "filestore-biniares"; }
+	virtual const char * getDescription() { return "Save downloaded "
+		"malware binaries in your local filesystem."; }
 	virtual void handleEvent(Event * event);
+	virtual void hashComputed(HashType type, uint8_t * data,
+		unsigned int dataLength, uint8_t * hash, unsigned int hashLength);
 
 private:
 	Daemon * m_daemon;
 
 	string m_directory;
+
+	HashType m_hashType;
+
+	list<pair<StreamRecorder *, string> > m_queue;
 };
 
 
-#endif // __MWCOLLECTD_FILESTORESTREAMS_HPP
+#endif // __MWCOLLECTD_FILESTOREBINARIES_HPP

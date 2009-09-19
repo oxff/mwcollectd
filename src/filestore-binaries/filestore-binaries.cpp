@@ -26,7 +26,7 @@
  *
  */
 
-#include "filestore-streams.hpp"
+#include "filestore-binaries.hpp"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -41,17 +41,38 @@
 using namespace std;
 
 
-FileStoreStreamsModule::FileStoreStreamsModule(Daemon * daemon)
+FileStoreBinariesModule::FileStoreBinariesModule(Daemon * daemon)
 {
 	m_daemon = daemon;
 }
 
 
-bool FileStoreStreamsModule::start(Configuration * moduleConfiguration)
+bool FileStoreBinariesModule::start(Configuration * moduleConfiguration)
 {
 	struct stat dir;
 
-	m_directory = moduleConfiguration->getString(":directory", "/var/log/mwcollectd/attacks/");
+	m_directory = PREFIX "/var/log/mwcollectd/binaries/";
+	m_hashType = HT_SHA2_256;
+
+	if(moduleConfiguration)
+	{
+		string hashType = moduleConfiguration->getString(":type", "sha256");
+		m_directory = moduleConfiguration->getString(":directory", m_directory.c_str());
+
+		if(hashType == "sha256")
+			m_hashType = HT_SHA2_256;
+		else if(hashType == "sha512")
+			m_hashType = HT_SHA2_512;
+		else if(hashType == "md5")
+			m_hashType = HT_MD5;
+		else
+		{
+			LOG(L_CRIT, "Hash type for filestore-binaries must be 'md5', 'sha256' or 'sha512'; not '%s'!",
+				hashType.c_str());
+
+			return false;
+		}
+	}
 
 	if(stat(m_directory.c_str(), &dir) < 0 || !(dir.st_mode & S_IFDIR))
 	{
@@ -62,69 +83,74 @@ bool FileStoreStreamsModule::start(Configuration * moduleConfiguration)
 	if(* (-- m_directory.end()) != '/')
 		m_directory.append(1, '/');
 
-	return m_daemon->getEventManager()->subscribeEventMask("stream.finished", this);
+	return m_daemon->getEventManager()->subscribeEventMask("shellcode.file", this);
 }
 
-void FileStoreStreamsModule::handleEvent(Event * event)
+void FileStoreBinariesModule::handleEvent(Event * event)
 {
-	if(event->getName() == "stream.finished")
+	StreamRecorder * recorder = (StreamRecorder *) (* event)["recorder"].getPointerValue();
+	string name = * (* event)["name"];
+	string dataref = recorder->getProperty(("file:" + name).c_str());
+
+	uint8_t * data = new uint8_t[dataref.size()];
+	memcpy(data, dataref.data(), dataref.size());
+
+	m_queue.push_back(pair<StreamRecorder *, string>( recorder, name));	
+	m_daemon->getHashManager()->computeHash(this, m_hashType, data, dataref.size());
+}
+
+void FileStoreBinariesModule::hashComputed(HashType type, uint8_t * data,
+	unsigned int dataLength, uint8_t * hash, unsigned int hashLength)
+{
+	StreamRecorder * recorder = m_queue.front().first;
+	string name = m_queue.front().second;
+
+	char filename[hashLength * 2 + 1];
+	int fd;
+
+	m_queue.pop_front();
+
+	for(unsigned int k = 0; k < hashLength; ++k)
+		sprintf(&filename[k << 1], "%02hx", hash[k]);
+
+	filename[hashLength << 1] = 0;
+
+	if((fd = open((m_directory + filename).c_str(), O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
 	{
-		StreamRecorder * recorder = (StreamRecorder *)
-			(* event)["recorder"].getPointerValue();
-		int fd;
+		LOG(L_CRIT, "Could not open %s for storing stream: %s", filename, strerror(errno));
 
-		for(StreamRecorder::Direction k = StreamRecorder::DIR_INCOMING;; k = StreamRecorder::DIR_OUTGOING)
-		{
-			recorder->acquireStreamData(k);
-			const basic_string<uint8_t>& incoming =
-				recorder->getStreamData(k);
-			stringstream filename;
+		recorder->release();
+		free(data);
 
-			filename << m_directory << recorder->getSource().name << '-' << recorder->getSource().port
-				<< "_to_" << recorder->getDestination().name << '-' << recorder->getDestination().port
-				<< (k == StreamRecorder::DIR_INCOMING ? "_in" : "_out");
-
-			if((fd = open(filename.str().c_str(), O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
-			{
-				LOG(L_CRIT, "Could not open %s for storing stream: %s", filename.str().c_str(), strerror(errno));
-				recorder->releaseStreamData(k);
-				return;
-			}
-
-			int ret;
-			basic_string<uint8_t>::size_type offset = 0;
-
-			while(offset < incoming.size() && (ret = write(fd, incoming.data() + offset, incoming.size() - offset)) > 0)
-				offset += ret;
-
-			if(offset < incoming.size())
-			{
-				LOG(L_CRIT, "Could not write all data to %s: %s", filename.str().c_str(), strerror(errno));
-
-				recorder->releaseStreamData(k);
-				close(fd);
-				return;
-			}
-
-			recorder->releaseStreamData(k);
-			close(fd);
-
-			if(k == StreamRecorder::DIR_OUTGOING)
-			{
-				break;
-			}
-		}
-
-		LOG(L_INFO, "Saved stream from %s:%u to %s:%u to filesystem.", recorder->getSource().name.c_str(),
-			recorder->getSource().port, recorder->getDestination().name.c_str(), recorder->getDestination().port);
+		return;
 	}
+
+	int ret;
+	basic_string<uint8_t>::size_type offset = 0;
+
+	while(offset < dataLength && (ret = write(fd, data + offset, dataLength - offset)) > 0)
+		offset += ret;
+
+	if(offset < dataLength)
+	{
+		LOG(L_CRIT, "Could not write all data to %s: %s", filename, strerror(errno));
+
+		close(fd);
+		recorder->release();
+		free(data);
+
+		return;
+	}
+
+	close(fd);
+	free(data);
 }
 
-bool FileStoreStreamsModule::stop()
+bool FileStoreBinariesModule::stop()
 {
-	m_daemon->getEventManager()->unsubscribeEventMask("stram.finished", this);
+	m_daemon->getEventManager()->unsubscribeEventMask("shellcode.file", this);
 	return true;
 }
 
-EXPORT_LIBNETWORKD_MODULE(FileStoreStreamsModule, Daemon *);
+EXPORT_LIBNETWORKD_MODULE(FileStoreBinariesModule, Daemon *);
 
