@@ -430,6 +430,7 @@ AC_OUTPUT([
 	src/shellcode-libemu/Makefile
 	src/embed-python/Makefile
 	src/log-file/Makefile
+	src/filestore-binaries/Makefile
 	])
 
 

@@ -23,6 +23,7 @@ SUBDIRS = core \
 	  filestore-streams \
 	  $(shellcode_libemu_dir) \
 	  $(embed_python_dir) \
-	  log-file
+	  log-file \
+	  filestore-binaries
 
 EXTRA_DIST = README
