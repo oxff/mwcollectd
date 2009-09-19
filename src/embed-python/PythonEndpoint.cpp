@@ -41,11 +41,14 @@ void PythonEndpoint::dataRead(const char * buf, uint32_t length)
 	m_recorder->appendStreamData(StreamRecorder::DIR_INCOMING,
 		(const uint8_t *) buf, length);
 
-	if(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain != TIMEOUT_EMPTY)
-		g_daemon->getTimeoutManager()->dropTimeout(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain);
+	if(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->sustain >= 0)
+	{
+		if(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain != TIMEOUT_EMPTY)
+			g_daemon->getTimeoutManager()->dropTimeout(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain);
 
-	((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain = g_daemon->getTimeoutManager()->scheduleTimeout(
-		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->sustain, this);
+		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain = g_daemon->getTimeoutManager()->scheduleTimeout(
+			((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->sustain, this);
+	}
 
 	PyObject * fn = PyObject_GetAttrString(m_pyEndpoint, "dataRead");
 
@@ -250,7 +253,12 @@ NetworkEndpoint * DynamicPythonEndpointFactory::createEndpoint(NetworkSocket * c
 void DynamicPythonEndpointFactory::destroyEndpoint(NetworkEndpoint * endpoint)
 {
 	if(refs() == 1)
+	{
 		g_module->deregisterFactory(m_address, m_port, this);
+
+		g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
+		m_timeout = TIMEOUT_EMPTY;
+	}
 
 	return PythonEndpointFactory::destroyEndpoint(endpoint);
 }

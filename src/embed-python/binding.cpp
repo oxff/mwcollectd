@@ -138,15 +138,15 @@ static PyObject * mwcollectd_NetworkEndpoint_new(PyTypeObject *type, PyObject *a
 
 static void mwcollectd_NetworkEndpoint_dealloc(mwcollectd_NetworkEndpoint * self)
 {
-	if(self->endpoint)
-		delete self->endpoint;
-
 	if(self->timeouts->tSustain != TIMEOUT_EMPTY)
 		g_daemon->getTimeoutManager()->dropTimeout(self->timeouts->tSustain);
 
 	if(self->timeouts->tKill != TIMEOUT_EMPTY)
 		g_daemon->getTimeoutManager()->dropTimeout(self->timeouts->tKill);
 	
+	if(self->endpoint)
+		delete self->endpoint;
+
 	Py_TYPE((PyObject *) self->timeouts)->tp_free(self->timeouts);
 
 	Py_TYPE((PyObject *) self)->tp_free(self);
