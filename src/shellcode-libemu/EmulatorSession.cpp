@@ -296,10 +296,10 @@ void EmulatorSession::closeHandle(uint32_t handle)
 	LOG(L_SPAM, "%p wrote \"%s\", %u bytes.", m_recorder,
 		it->second.name.c_str(), it->second.contents.size());
 
-	m_recorder->setProperty(("content:" + it->second.name).c_str(), it->second.contents);
+	m_recorder->setProperty(("file:" + it->second.name).c_str(), it->second.contents);
 
 	{
-		Event ev = Event("shellcode.newfile");
+		Event ev = Event("shellcode.file");
 
 		ev["recorder"] = (void *) m_recorder;
 		ev["name"] = it->second.name;
