@@ -106,44 +106,84 @@ void FileStoreBinariesModule::hashComputed(HashType type, uint8_t * data,
 	string name = m_queue.front().second;
 
 	char filename[hashLength * 2 + 1];
-	int fd;
 
 	m_queue.pop_front();
 
-	for(unsigned int k = 0; k < hashLength; ++k)
-		sprintf(&filename[k << 1], "%02hx", hash[k]);
-
-	filename[hashLength << 1] = 0;
-
-	if((fd = open((m_directory + filename).c_str(), O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
 	{
-		LOG(L_CRIT, "Could not open %s for storing stream: %s", filename, strerror(errno));
+		for(unsigned int k = 0; k < hashLength; ++k)
+			sprintf(&filename[k << 1], "%02hx", hash[k]);
 
-		recorder->release();
-		free(data);
-
-		return;
+		filename[hashLength << 1] = 0;
 	}
 
-	int ret;
-	basic_string<uint8_t>::size_type offset = 0;
-
-	while(offset < dataLength && (ret = write(fd, data + offset, dataLength - offset)) > 0)
-		offset += ret;
-
-	if(offset < dataLength)
 	{
-		LOG(L_CRIT, "Could not write all data to %s: %s", filename, strerror(errno));
+		int fd;
+
+		if((fd = open((m_directory + filename).c_str(), O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
+		{
+			LOG(L_CRIT, "Could not open %s for storing stream: %s", filename, strerror(errno));
+
+			recorder->release();
+			free(data);
+
+			return;
+		}
+
+		int ret;
+		basic_string<uint8_t>::size_type offset = 0;
+
+		while(offset < dataLength && (ret = write(fd, data + offset, dataLength - offset)) > 0)
+			offset += ret;
+
+		if(offset < dataLength)
+		{
+			LOG(L_CRIT, "Could not write all data to %s: %s", filename, strerror(errno));
+
+			close(fd);
+			recorder->release();
+			free(data);
+
+			return;
+		}
 
 		close(fd);
-		recorder->release();
-		free(data);
+	}
+	
+	free(data);
 
-		return;
+	{
+		int fd;
+
+		if((fd = open((m_directory + filename + ".instances").c_str(), O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
+		{
+			LOG(L_CRIT, "Could not open %s for storing instances: %s", filename, strerror(errno));
+
+			recorder->release();
+			free(data);
+
+			return;
+		}
+
+		FILE * file = fdopen(fd, "at");
+
+		fprintf(file, "%s:%hu -> %s:%hu\n", recorder->getSource().name.c_str(), recorder->getSource().port,
+			recorder->getDestination().name.c_str(), recorder->getDestination().port);
+
+		vector<pair<string, string> > props = recorder->getProperties();
+
+		for(vector<pair<string, string> >::iterator it = props.begin(); it != props.end(); ++it)
+		{
+			if(it->first.substr(0, 5) == "file:")
+				continue;
+
+			fprintf(file, "\t%s: %s\n", it->first.c_str(), it->second.c_str());
+		}
+
+		fclose(file);
+		close(fd);
 	}
 
-	close(fd);
-	free(data);
+	recorder->release();
 }
 
 bool FileStoreBinariesModule::stop()
