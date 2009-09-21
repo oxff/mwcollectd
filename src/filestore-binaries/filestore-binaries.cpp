@@ -154,32 +154,34 @@ void FileStoreBinariesModule::hashComputed(HashType type, uint8_t * data,
 	{
 		int fd;
 
-		if((fd = open((m_directory + filename + ".instances").c_str(), O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
+		if((fd = open((m_directory + filename + ".instances").c_str(), O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
 		{
 			LOG(L_CRIT, "Could not open %s for storing instances: %s", filename, strerror(errno));
 
 			recorder->release();
-			free(data);
-
 			return;
 		}
 
 		FILE * file = fdopen(fd, "at");
 
-		fprintf(file, "%s:%hu -> %s:%hu\n", recorder->getSource().name.c_str(), recorder->getSource().port,
-			recorder->getDestination().name.c_str(), recorder->getDestination().port);
-
-		vector<pair<string, string> > props = recorder->getProperties();
-
-		for(vector<pair<string, string> >::iterator it = props.begin(); it != props.end(); ++it)
+		if(file)
 		{
-			if(it->first.substr(0, 5) == "file:")
-				continue;
+			fprintf(file, "%s:%hu -> %s:%hu\n", recorder->getSource().name.c_str(), recorder->getSource().port,
+				recorder->getDestination().name.c_str(), recorder->getDestination().port);
 
-			fprintf(file, "\t%s: %s\n", it->first.c_str(), it->second.c_str());
+			vector<pair<string, string> > props = recorder->getProperties();
+
+			for(vector<pair<string, string> >::iterator it = props.begin(); it != props.end(); ++it)
+			{
+				if(it->first.substr(0, 5) == "file:")
+					continue;
+
+				fprintf(file, "\t%s: %s\n", it->first.c_str(), it->second.c_str());
+			}
+
+			fclose(file);
 		}
-
-		fclose(file);
+		
 		close(fd);
 	}
 
