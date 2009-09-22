@@ -13,7 +13,7 @@ class ShellcodeProcessHandler:
 		commands = [ ]
 		curr = ''
 		escaping = False
-		separators = frozenset( ['|', '&', ';'] )
+		separators = frozenset( ['|', '&'] )
 
 		for c in cmd:
 			if not escaping:
@@ -37,7 +37,7 @@ class ShellcodeProcessHandler:
 		for cmd in commands:
 			quoter = None
 			quotes = frozenset( ["'", '"'] )
-			separators = frozenset( [' ', '\t'] )
+			separators = frozenset( [' ', '\t', ',', ';'] )
 			curr = ''
 			ccmd = [ ]
 
