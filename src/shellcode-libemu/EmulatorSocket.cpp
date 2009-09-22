@@ -271,8 +271,21 @@ int EmulatorSocket::connect(uint32_t address, uint16_t port)
 int EmulatorSocket::bind(uint32_t address, uint16_t port)
 {
 	struct sockaddr_in addr;
+	uint32_t effectiveAddress;
 
-	addr.sin_addr.s_addr = address;
+	if(!inet_aton(m_session->getRecorder()->getDestination().name.c_str(), (struct in_addr *) &effectiveAddress))
+		return -1;
+
+	if(address != INADDR_ANY && address != effectiveAddress)
+	{
+		char buf[16];
+
+		strcpy(buf, inet_ntoa(* (struct in_addr *) &address));
+		GLOG(L_INFO, "Shellcode of %p tried to bind %s, but attack went to %s!", m_session->getRecorder(),
+			buf, inet_ntoa(* (struct in_addr *) &effectiveAddress));
+	}
+
+	addr.sin_addr.s_addr = effectiveAddress;
 	addr.sin_port = port;
 	addr.sin_family = AF_INET;
 

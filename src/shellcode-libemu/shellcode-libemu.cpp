@@ -33,7 +33,7 @@
 
 ShellcodeLibemuModule::ShellcodeLibemuModule(Daemon * daemon)
 {
-	m_daemon = daemon;
+	g_daemon = m_daemon = daemon;
 	m_exiting = false;
 
 	pthread_mutex_init(&m_testQueueMutex, 0);

@@ -164,6 +164,9 @@ public:
 	inline void resetStepCounter()
 	{ m_steps = 0; }
 
+	inline const StreamRecorder * getRecorder()
+	{ return m_recorder; }
+
 protected:
 	void registerHooks();
 
@@ -305,6 +308,9 @@ private:
 
 	bool m_active;
 };
+
+
+extern Daemon * g_daemon;
 
 
 #endif // __MWCOLLECTD_SHELLCODELIBEMU_HPP
