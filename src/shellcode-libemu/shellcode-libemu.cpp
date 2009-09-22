@@ -53,7 +53,10 @@ bool ShellcodeLibemuModule::start(Configuration * config)
 	size_t threads = 0;
 	
 	if(config)
+	{
 		threads = config->getInteger(":threads", 0);
+		m_timeLimit = config->getInteger(":time-limit", 300);
+	}
 
 	if(!threads)
 	{
@@ -219,14 +222,14 @@ void ShellcodeLibemuModule::loop()
 						result.test.recorder->getStreamData(StreamRecorder::DIR_INCOMING);
 					emu = new EmulatorSession(stream.data(),
 						stream.size(), result.shellcodeOffset, m_daemon,
-						result.test.recorder);
+						result.test.recorder, m_timeLimit);
 					
 				}
 				else
 				{
 					emu = new EmulatorSession((uint8_t *) result.test.buffer.data(),
 						result.test.buffer.size(), result.shellcodeOffset, m_daemon,
-						result.test.recorder);
+						result.test.recorder, m_timeLimit);
 				}
 
 				m_emulators.push_back(emu);

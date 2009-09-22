@@ -40,7 +40,8 @@
 
 
 EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
-	uint32_t startOffset, Daemon * daemon, StreamRecorder * recorder)
+	uint32_t startOffset, Daemon * daemon, StreamRecorder * recorder,
+	uint32_t timeoutLimit)
 {
 	m_emu = emu_new();
 	m_env = emu_env_new(m_emu);
@@ -72,6 +73,8 @@ EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
 
 	m_recorder = recorder;
 	m_recorder->acquire();
+
+	m_Timeout = daemon->getTimeoutManager()->scheduleTimeout(timeoutLimit, this);
 }
 
 EmulatorSession::~EmulatorSession()
@@ -91,6 +94,9 @@ EmulatorSession::~EmulatorSession()
 		m_daemon->getNetworkManager()->removeSocket(it->second);
 		delete it->second;
 	}
+
+	if(m_Timeout != TIMEOUT_EMPTY)
+		m_daemon->getTimeoutManager()->dropTimeout(m_Timeout);
 }
 
 void EmulatorSession::registerHooks()
@@ -126,6 +132,9 @@ bool EmulatorSession::step()
 	gettimeofday(&start, 0);
 #endif
 	size_t k;
+
+	if(m_Timeout == TIMEOUT_EMPTY)
+		return false;
 
 	for(k = 0; m_active && k < 4096; ++k)
 	{
@@ -322,5 +331,12 @@ void EmulatorSession::createProcess(const char * image, const char * commandline
 		ev["commandline"] = commandline;
 
 	m_daemon->getEventManager()->fireEvent(&ev);
+}
+
+
+void EmulatorSession::timeoutFired(Timeout t)
+{
+	if(m_Timeout == t)
+		m_Timeout = TIMEOUT_EMPTY;
 }
 
