@@ -154,9 +154,9 @@ public:
 		return result;
 	}
 
-	inline NetworkNode getSource()
+	inline const NetworkNode& getSource() const
 	{ return m_source; }
-	inline NetworkNode getDestination()
+	inline const NetworkNode& getDestination() const
 	{ return m_destination; }
 
 
