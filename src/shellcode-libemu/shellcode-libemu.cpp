@@ -271,4 +271,7 @@ void ShellcodeLibemuModule::updateEmulatorStates()
 }
 
 
+Daemon * g_daemon;
+
+
 EXPORT_LIBNETWORKD_MODULE(ShellcodeLibemuModule, Daemon *);
