@@ -58,9 +58,9 @@ void EmulatorSocket::pollRead()
 
 		case SS_LISTENING:
 		{
-			uint8_t buf[m_rsize];
-			socklen_t len = m_rsize;
-			int res = ::accept(m_fd, m_rbuf ? (struct sockaddr *) buf : 0, m_rbuf ? &len : 0);
+			struct sockaddr_in remoteAddress;
+			socklen_t l = sizeof(remoteAddress);
+			int res = ::accept(m_fd, (struct sockaddr *) &remoteAddress, &l);
 
 			if(res < 0)
 			{
@@ -74,9 +74,16 @@ void EmulatorSocket::pollRead()
 				return;
 			}				
 
+			GLOG(L_INFO, "Successful incoming connection from %s:%hu for recorder %p [wakeup].",
+				inet_ntoa(remoteAddress.sin_addr), ntohs(remoteAddress.sin_port),
+				m_session->getRecorder());
+
 			if(m_rbuf)
 			{
-				if(emu_memory_write_block(m_memory, m_rbuf, buf, len) < 0)
+				if(m_rsize > l)
+					m_rsize = l;
+
+				if(emu_memory_write_block(m_memory, m_rbuf, &remoteAddress, m_rsize) < 0)
 				{
 					m_session->socketWakeup(-1);
 					return;
@@ -300,14 +307,12 @@ int EmulatorSocket::listen(uint32_t backlog)
 
 int EmulatorSocket::accept(uint32_t guestbuf, uint32_t length)
 {
-	if(length > 64)
-		length = 64;
-
-	uint8_t buf[length];
+	struct sockaddr_in remoteAddress;
+	size_t l = sizeof(remoteAddress);
 	int res;
 	
 
-	if((res = ::accept(m_fd, guestbuf ? (struct sockaddr *) buf : 0, guestbuf ? &length : 0)) < 0)
+	if((res = ::accept(m_fd, (struct sockaddr *) &remoteAddress, &length)) < 0)
 	{
 		if(errno == EWOULDBLOCK || errno == EAGAIN)
 		{
@@ -322,9 +327,16 @@ int EmulatorSocket::accept(uint32_t guestbuf, uint32_t length)
 		return -1;
 	}
 
+	GLOG(L_INFO, "Successful incoming connection from %s:%hu for recorder %p [pending].",
+		inet_ntoa(remoteAddress.sin_addr), ntohs(remoteAddress.sin_port),
+		m_session->getRecorder());
+
+	if(length < l)
+		l = length;
+
 	if(guestbuf)
 	{
-		if(emu_memory_write_block(m_memory, guestbuf, buf, length) < 0)
+		if(emu_memory_write_block(m_memory, guestbuf, &remoteAddress, l) < 0)
 			return -1;
 	}
 
