@@ -337,6 +337,9 @@ void EmulatorSession::createProcess(const char * image, const char * commandline
 void EmulatorSession::timeoutFired(Timeout t)
 {
 	if(m_Timeout == t)
+	{
+		m_active = true;
 		m_Timeout = TIMEOUT_EMPTY;
+	}
 }
 
