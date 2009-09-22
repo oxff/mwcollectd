@@ -134,12 +134,29 @@ extern EmbedPythonModule * g_module;
 extern Daemon * g_daemon;
 
 
+class PythonEndpoint;
+
+typedef struct {
+	PyObject_HEAD
+	PythonEndpoint * endpoint;
+
+	long sustain, kill;
+	Timeout tSustain, tKill;
+} mwcollectd_NetworkEndpointTimeouts;
+
+typedef struct {
+	PyObject_HEAD
+	PythonEndpoint * endpoint;
+	mwcollectd_NetworkEndpointTimeouts * timeouts;
+} mwcollectd_NetworkEndpoint;
+
+
 class PythonEndpoint : public NetworkEndpoint, public NameResolver, public TimeoutReceiver
 {
 public:
 	PythonEndpoint(PyObject * endpoint)
 		: m_socket(0), m_cachePort(0)
-	{ m_pyEndpoint = endpoint; }
+	{ m_pyEndpoint = (mwcollectd_NetworkEndpoint *) endpoint; }
 	virtual ~PythonEndpoint();
 
 	virtual void dataRead(const char * buffer, uint32_t dataLength);
@@ -181,26 +198,12 @@ public:
 
 private:
 	NetworkSocket * m_socket;
-	PyObject * m_pyEndpoint;
+	mwcollectd_NetworkEndpoint * m_pyEndpoint;
 
 	StreamRecorder * m_recorder;
 
 	uint16_t m_cachePort;
 };
-
-typedef struct {
-	PyObject_HEAD
-	PythonEndpoint * endpoint;
-
-	long sustain, kill;
-	Timeout tSustain, tKill;
-} mwcollectd_NetworkEndpointTimeouts;
-
-typedef struct {
-	PyObject_HEAD
-	PythonEndpoint * endpoint;
-	mwcollectd_NetworkEndpointTimeouts * timeouts;
-} mwcollectd_NetworkEndpoint;
 
 
 class PythonEndpointFactory : public NetworkEndpointFactory

@@ -275,8 +275,6 @@ bool EmulatorSession::appendFile(uint32_t handle, uint8_t * buffer, uint32_t len
 {
 	unordered_map<uint32_t, VirtualFile>::iterator it = m_files.find(handle);
 
-	LOG(L_SPAM, "%s: %p, %u", __PRETTY_FUNCTION__, m_recorder, length);
-
 	if(it == m_files.end())
 		return false;
 
@@ -293,7 +291,7 @@ void EmulatorSession::closeHandle(uint32_t handle)
 	if(it == m_files.end())
 		return;
 
-	LOG(L_SPAM, "%p wrote \"%s\", %u bytes.", m_recorder,
+	LOG(L_SPAM, "Shellcode in %p wrote \"%s\", %u bytes.", m_recorder,
 		it->second.name.c_str(), it->second.contents.size());
 
 	m_recorder->setProperty(("file:" + it->second.name).c_str(), it->second.contents);

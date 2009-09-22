@@ -124,7 +124,7 @@ void FileStoreBinariesModule::hashComputed(HashType type, uint8_t * data,
 			LOG(L_CRIT, "Could not open %s for storing stream: %s", filename, strerror(errno));
 
 			recorder->release();
-			free(data);
+			delete [] data;
 
 			return;
 		}
@@ -141,7 +141,7 @@ void FileStoreBinariesModule::hashComputed(HashType type, uint8_t * data,
 
 			close(fd);
 			recorder->release();
-			free(data);
+			delete [] data;
 
 			return;
 		}
@@ -149,7 +149,7 @@ void FileStoreBinariesModule::hashComputed(HashType type, uint8_t * data,
 		close(fd);
 	}
 	
-	free(data);
+	delete [] data;
 
 	{
 		int fd;
