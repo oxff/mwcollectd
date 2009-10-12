@@ -123,12 +123,16 @@ private:
 	struct emu_memory * m_memory;
 };
 
-class EmulatorSession
+class EmulatorSession : public TimeoutReceiver
 {
 public:
 	EmulatorSession(const uint8_t * data, size_t size, uint32_t startOffset,
-		Daemon * daemon, StreamRecorder * recorder);
+		Daemon * daemon, StreamRecorder * recorder, uint32_t timeLimit);
 	~EmulatorSession();
+
+
+	virtual void timeoutFired(Timeout t);
+
 
 	bool step();
 
@@ -164,6 +168,9 @@ public:
 	inline void resetStepCounter()
 	{ m_steps = 0; }
 
+	inline const StreamRecorder * getRecorder()
+	{ return m_recorder; }
+
 protected:
 	void registerHooks();
 
@@ -197,6 +204,8 @@ private:
 	Daemon * m_daemon;
 	StreamRecorder * m_recorder;
 	bool m_active;
+
+	Timeout m_Timeout;
 };
 
 class AnalyzerThread;
@@ -272,6 +281,7 @@ private:
 
 	list<EmulatorSession *> m_emulators, m_sleepingEmulators;
 
+	uint32_t m_timeLimit;
 	bool m_exiting;
 };
 
@@ -305,6 +315,9 @@ private:
 
 	bool m_active;
 };
+
+
+extern Daemon * g_daemon;
 
 
 #endif // __MWCOLLECTD_SHELLCODELIBEMU_HPP

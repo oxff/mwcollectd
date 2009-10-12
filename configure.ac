@@ -2,8 +2,8 @@
 # (c) 2009 by Georg Wicherski, Kaspersky Labs GmbH <gw@mwcollect.org>
 
 AC_PREREQ(2.59)
-AC_INIT([mwcollectd], [4.0.0], [gw@mwcollect.org])
-AM_INIT_AUTOMAKE([mwcollectd], [4.0.0])
+AC_INIT([mwcollectd], [4.0.0-alpha1], [gw@mwcollect.org])
+AM_INIT_AUTOMAKE([mwcollectd], [4.0.0-alpha1])
 
 AC_PREFIX_DEFAULT(/opt/mwcollectd)
 AC_DEFINE_UNQUOTED(PREFIX, "$prefix")

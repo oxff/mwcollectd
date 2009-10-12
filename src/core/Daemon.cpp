@@ -149,11 +149,11 @@ bool Daemon::run(char * changeUser)
 		{
 			uint32_t timeout = m_TimeoutManager.deltaNext();
 
-//			if(m_HashManager.computationPending())
-//				timeout = 0;
+			if(m_HashManager.computationPending())
+				timeout = 0;
 
 			m_TimeoutManager.fireTimeouts();
-//			m_HashManager.loop();
+			m_HashManager.loop();
 
 			for(std::list<CoreLoopable *>::iterator it = m_loopables.begin();
 				it != m_loopables.end(); ++it)

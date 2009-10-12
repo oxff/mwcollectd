@@ -43,19 +43,18 @@ void PythonEndpoint::dataRead(const char * buf, uint32_t length)
 
 	if(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->sustain >= 0)
 	{
-		if(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain != TIMEOUT_EMPTY)
-			g_daemon->getTimeoutManager()->dropTimeout(((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain);
+		if(m_pyEndpoint->timeouts->tSustain != TIMEOUT_EMPTY)
+			g_daemon->getTimeoutManager()->dropTimeout(m_pyEndpoint->timeouts->tSustain);
 
-		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain = g_daemon->getTimeoutManager()->scheduleTimeout(
-			((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->sustain, this);
+		m_pyEndpoint->timeouts->tSustain = g_daemon->getTimeoutManager()->scheduleTimeout(m_pyEndpoint->timeouts->sustain, this);
 	}
 
-	PyObject * fn = PyObject_GetAttrString(m_pyEndpoint, "dataRead");
+	PyObject * fn = PyObject_GetAttrString((PyObject *) m_pyEndpoint, "dataRead");
 
 	if(!fn || !PyCallable_Check(fn))
 	{
 		GLOG(L_CRIT, "%s has no callable attribute 'dataRead'!",
-			EmbedPythonModule::toString(m_pyEndpoint).c_str());
+			EmbedPythonModule::toString((PyObject *) m_pyEndpoint).c_str());
 		PyErr_Clear();
 		return;
 	}
@@ -67,7 +66,7 @@ void PythonEndpoint::dataRead(const char * buf, uint32_t length)
 	if(!res)
 	{
 		GLOG(L_CRIT, "Calling attribute 'dataRead' of %s failed:", 
-			EmbedPythonModule::toString(m_pyEndpoint).c_str());
+			EmbedPythonModule::toString((PyObject *) m_pyEndpoint).c_str());
 
 		g_module->logError();
 		PyErr_Clear();
@@ -82,14 +81,14 @@ void PythonEndpoint::dataRead(const char * buf, uint32_t length)
 
 void PythonEndpoint::connectionEstablished(NetworkNode * remote, NetworkNode * local)
 {
-	PyObject * fn = PyObject_GetAttrString(m_pyEndpoint, "connectionEstablished");
+	PyObject * fn = PyObject_GetAttrString((PyObject *) m_pyEndpoint, "connectionEstablished");
 
 	m_recorder = new StreamRecorder(remote, local);
 
 	if(!fn || !PyCallable_Check(fn))
 	{
 		GLOG(L_CRIT, "%s has no callable attribute 'connectionEstablished'!",
-			EmbedPythonModule::toString(m_pyEndpoint).c_str());
+			EmbedPythonModule::toString((PyObject *) m_pyEndpoint).c_str());
 
 		PyErr_Clear();
 		return;
@@ -101,7 +100,7 @@ void PythonEndpoint::connectionEstablished(NetworkNode * remote, NetworkNode * l
 	if(!res)
 	{
 		GLOG(L_CRIT, "Calling attribute 'connectionEstablished' of %s failed:", 
-			EmbedPythonModule::toString(m_pyEndpoint).c_str());
+			EmbedPythonModule::toString((PyObject *) m_pyEndpoint).c_str());
 
 		g_module->logError();
 		PyErr_Clear();
@@ -121,16 +120,28 @@ void PythonEndpoint::connectionClosed()
 		g_daemon->getEventManager()->fireEvent(&ev);
 	}
 
+	if(m_pyEndpoint->timeouts->tSustain != TIMEOUT_EMPTY)
 	{
-		PyObject * fn = PyObject_GetAttrString(m_pyEndpoint, "connectionClosed");
+		g_daemon->getTimeoutManager()->dropTimeout(m_pyEndpoint->timeouts->tSustain);
+		m_pyEndpoint->timeouts->tSustain = TIMEOUT_EMPTY;
+	}
+
+	if(m_pyEndpoint->timeouts->tKill != TIMEOUT_EMPTY)
+	{
+		g_daemon->getTimeoutManager()->dropTimeout(m_pyEndpoint->timeouts->tKill);
+		m_pyEndpoint->timeouts->tKill = TIMEOUT_EMPTY;
+	}
+
+	{
+		PyObject * fn = PyObject_GetAttrString((PyObject *) m_pyEndpoint, "connectionClosed");
 
 		if(!fn || !PyCallable_Check(fn))
 		{
 			GLOG(L_SPAM, "%s has no callable attribute 'connectionClosed'!",
-				EmbedPythonModule::toString(m_pyEndpoint).c_str());
+				EmbedPythonModule::toString((PyObject *) m_pyEndpoint).c_str());
 
 			PyErr_Clear();
-			Py_DECREF(m_pyEndpoint);
+			Py_DECREF((PyObject *) m_pyEndpoint);
 
 			return;
 		}
@@ -141,20 +152,20 @@ void PythonEndpoint::connectionClosed()
 		if(!res)
 		{
 			GLOG(L_CRIT, "Calling attribute 'connectionClosed' of %s failed:", 
-				EmbedPythonModule::toString(m_pyEndpoint).c_str());
+				EmbedPythonModule::toString((PyObject *) m_pyEndpoint).c_str());
 
 			g_module->logError();
 			PyErr_Clear();
 
 			Py_DECREF(fn);
-			Py_DECREF(m_pyEndpoint);
+			Py_DECREF((PyObject *) m_pyEndpoint);
 
 			return;
 		}
 
 		Py_DECREF(res);
 
-		Py_DECREF(m_pyEndpoint);
+		Py_DECREF((PyObject *) m_pyEndpoint);
 	}
 }
 
@@ -174,23 +185,22 @@ void PythonEndpoint::nameResolved(string name, list<string> addresses,
 
 void PythonEndpoint::timeoutFired(Timeout t)
 {
-	if(t == ((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain)
+	if(t == m_pyEndpoint->timeouts->tSustain)
 	{
-		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->sustain = -1;
-		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tSustain = TIMEOUT_EMPTY;
+		m_pyEndpoint->timeouts->sustain = -1;
+		m_pyEndpoint->timeouts->tSustain = TIMEOUT_EMPTY;
 
 		m_socket->close(true);
 	}
-	else if(t == ((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tKill)
+	else if(t == m_pyEndpoint->timeouts->tKill)
 	{
-		GLOG(L_CRIT, "%s: %p, %p, %p", __PRETTY_FUNCTION__, m_socket, t,
-				((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tKill);
-
-		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->kill = -1;
-		((mwcollectd_NetworkEndpoint *) m_pyEndpoint)->timeouts->tKill = TIMEOUT_EMPTY;
+		m_pyEndpoint->timeouts->kill = -1;
+		m_pyEndpoint->timeouts->tKill = TIMEOUT_EMPTY;
 
 		m_socket->close(true);
 	}
+	else
+		GLOG(L_CRIT, __PRETTY_FUNCTION__);
 }
 
 

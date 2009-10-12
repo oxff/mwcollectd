@@ -40,7 +40,8 @@
 
 
 EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
-	uint32_t startOffset, Daemon * daemon, StreamRecorder * recorder)
+	uint32_t startOffset, Daemon * daemon, StreamRecorder * recorder,
+	uint32_t timeoutLimit)
 {
 	m_emu = emu_new();
 	m_env = emu_env_new(m_emu);
@@ -72,6 +73,8 @@ EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
 
 	m_recorder = recorder;
 	m_recorder->acquire();
+
+	m_Timeout = daemon->getTimeoutManager()->scheduleTimeout(timeoutLimit, this);
 }
 
 EmulatorSession::~EmulatorSession()
@@ -91,6 +94,9 @@ EmulatorSession::~EmulatorSession()
 		m_daemon->getNetworkManager()->removeSocket(it->second);
 		delete it->second;
 	}
+
+	if(m_Timeout != TIMEOUT_EMPTY)
+		m_daemon->getTimeoutManager()->dropTimeout(m_Timeout);
 }
 
 void EmulatorSession::registerHooks()
@@ -126,6 +132,9 @@ bool EmulatorSession::step()
 	gettimeofday(&start, 0);
 #endif
 	size_t k;
+
+	if(m_Timeout == TIMEOUT_EMPTY)
+		return false;
 
 	for(k = 0; m_active && k < 4096; ++k)
 	{
@@ -187,7 +196,7 @@ void EmulatorSession::addDirectDownload(const char * url, const char * filename)
 	m_recorder->setProperty("localfile", filename);
 
 	{
-		Event ev = Event("download.request");
+		Event ev = Event("shellcode.download");
 
 		ev["url"] = url;
 		ev["recorder"] = (void *) m_recorder;
@@ -275,8 +284,6 @@ bool EmulatorSession::appendFile(uint32_t handle, uint8_t * buffer, uint32_t len
 {
 	unordered_map<uint32_t, VirtualFile>::iterator it = m_files.find(handle);
 
-	LOG(L_SPAM, "%s: %p, %u", __PRETTY_FUNCTION__, m_recorder, length);
-
 	if(it == m_files.end())
 		return false;
 
@@ -293,7 +300,7 @@ void EmulatorSession::closeHandle(uint32_t handle)
 	if(it == m_files.end())
 		return;
 
-	LOG(L_SPAM, "%p wrote \"%s\", %u bytes.", m_recorder,
+	LOG(L_SPAM, "Shellcode in %p wrote \"%s\", %u bytes.", m_recorder,
 		it->second.name.c_str(), it->second.contents.size());
 
 	m_recorder->setProperty(("file:" + it->second.name).c_str(), it->second.contents);
@@ -324,5 +331,15 @@ void EmulatorSession::createProcess(const char * image, const char * commandline
 		ev["commandline"] = commandline;
 
 	m_daemon->getEventManager()->fireEvent(&ev);
+}
+
+
+void EmulatorSession::timeoutFired(Timeout t)
+{
+	if(m_Timeout == t)
+	{
+		m_active = true;
+		m_Timeout = TIMEOUT_EMPTY;
+	}
 }
 

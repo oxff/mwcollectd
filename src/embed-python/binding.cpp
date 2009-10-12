@@ -138,12 +138,6 @@ static PyObject * mwcollectd_NetworkEndpoint_new(PyTypeObject *type, PyObject *a
 
 static void mwcollectd_NetworkEndpoint_dealloc(mwcollectd_NetworkEndpoint * self)
 {
-	if(self->timeouts->tSustain != TIMEOUT_EMPTY)
-		g_daemon->getTimeoutManager()->dropTimeout(self->timeouts->tSustain);
-
-	if(self->timeouts->tKill != TIMEOUT_EMPTY)
-		g_daemon->getTimeoutManager()->dropTimeout(self->timeouts->tKill);
-	
 	if(self->endpoint)
 		delete self->endpoint;
 
@@ -401,6 +395,177 @@ static PyTypeObject mwcollectd_NetworkServerType = {
 
 
 
+class PythonEventHandler;
+
+typedef struct {
+	PyObject_HEAD
+	bool registered;
+	PyObject * handlerType;
+	char * name;
+	PythonEventHandler * handler;
+} mwcollectd_EventSubscription;
+
+class PythonEventHandler : public EventSubscriber
+{
+public:
+	PythonEventHandler(mwcollectd_EventSubscription * subscription)
+	{ m_subscription = subscription; }
+
+	virtual ~PythonEventHandler() { }
+
+	virtual void handleEvent(Event * ev)
+	{
+		PyObject * event = PyDict_New();
+		const Event::AttributeMap& attributes = ev->getAttributes();
+
+		for(Event::AttributeMap::const_iterator it = attributes.begin(); it != attributes.end(); ++it)
+		{
+			PyObject * attr;
+
+			switch(it->second.getType())
+			{
+				default:
+				case EVENT_AT_EMPTY:
+					attr = 0;
+					break;
+
+				case EVENT_AT_INTEGER:
+					attr = PyLong_FromUnsignedLong(it->second.getIntegerValue());
+					break;
+
+				case EVENT_AT_STRING:
+				{
+					string val = it->second.getStringValue();
+
+					attr = PyBytes_FromStringAndSize(val.data(), val.size());
+					break;
+				}
+
+				case EVENT_AT_POINTER:
+					attr = PyCObject_FromVoidPtr(it->second.getPointerValue(), 0);
+					break;
+			}
+			
+			if(!attr)
+				continue;
+
+			if(PyDict_SetItemString(event, it->first.c_str(), attr) < 0)
+			{
+				GLOG(L_CRIT, "Adding attribute '%s' of event '%s' failed:", it->first.c_str(), ev->getName().c_str());
+				g_module->logError();
+
+				Py_DECREF(event);
+				return;
+			}
+		}
+
+		{
+			PyObject * name = PyUnicode_FromString(ev->getName().c_str());
+			PyObject * args = PyTuple_Pack(2, name, event);
+			PyObject * handler = PyObject_Call((PyObject *) m_subscription->handlerType, args, Py_None);
+
+			Py_XDECREF(args);
+			Py_DECREF(name);
+			Py_DECREF(event);
+
+			if(!handler)
+			{
+				GLOG(L_CRIT, "Creation of event handler %s for '%s' failed:", EmbedPythonModule::toString((PyObject *) m_subscription->handlerType).c_str(),
+					m_subscription->name);
+				g_module->logError();
+
+				return;
+			}
+
+			Py_DECREF(handler);
+		}
+	}
+
+private:
+	mwcollectd_EventSubscription * m_subscription;
+};
+
+
+static PyObject * mwcollectd_EventSubscription_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	mwcollectd_EventSubscription * self;
+	char * name;
+
+	self = (mwcollectd_EventSubscription *) type->tp_alloc(type, 0);
+
+	if(!PyArg_ParseTuple(args, "sO!:EventSubscription", &name, &PyType_Type, &self->handlerType))
+		return 0;
+
+	self->handler = new PythonEventHandler(self);
+	self->registered = false;
+	self->name = strdup(name);
+
+	return (PyObject *) self;
+}
+
+static void mwcollectd_EventSubscription_dealloc(mwcollectd_EventSubscription * self)
+{
+	if(self->registered)
+		g_daemon->getEventManager()->unsubscribeEventMask(self->name, self->handler);
+
+	free(self->name);
+	delete self->handler;
+
+	Py_TYPE((PyObject *) self)->tp_free(self);
+}
+
+static PyObject * mwcollectd_EventSubscription_register(mwcollectd_EventSubscription * self, PyObject * args, PyObject * kwargs)
+{
+	if(self->registered)
+		Py_RETURN_TRUE;
+
+	if(!g_daemon->getEventManager()->subscribeEventMask(self->name, self->handler))
+		Py_RETURN_FALSE;
+
+	self->registered = true;
+	Py_RETURN_TRUE;
+}
+
+static PyObject * mwcollectd_EventSubscription_deregister(mwcollectd_EventSubscription * self, PyObject * args, PyObject * kwargs)
+{
+	if(!self->registered)
+		Py_RETURN_TRUE;
+	
+	self->registered = false;
+
+	if(!g_daemon->getEventManager()->unsubscribeEventMask(self->name, self->handler))
+		Py_RETURN_FALSE;
+
+	Py_RETURN_TRUE;
+}
+
+
+
+static PyMethodDef mwcollectd_EventSubscription_methods[] = {
+	{ "register", (PyObject * (*)(PyObject *, PyObject *)) mwcollectd_EventSubscription_register, METH_NOARGS,
+		"Register this event subscription in the global EventManager." },
+	{ "unregister", (PyObject * (*)(PyObject *, PyObject *)) mwcollectd_EventSubscription_deregister, METH_NOARGS,
+		"Unregister this subscription from the EventManager." },
+	{ 0, 0, 0, 0 }
+};
+
+static PyTypeObject mwcollectd_EventSubscriptionType = {
+	PyObject_HEAD_INIT(NULL)
+	"mwcollectd.EventSubscription",
+	sizeof(mwcollectd_EventSubscription),
+	0, 
+	(void (*)(PyObject *)) mwcollectd_EventSubscription_dealloc,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	Py_TPFLAGS_DEFAULT,
+	"Subscription of a specific event name / mask in the daemon.",
+	0, 0, 0, 0, 0, 0,
+	mwcollectd_EventSubscription_methods,
+	0, 0, 0, 0, 0, 0, 0, 0, 0,
+	mwcollectd_EventSubscription_new
+};
+
+
+
 static PyObject * mwcollectd_log(PyObject *self, PyObject *args)
 {
 	LogManager::LogLevel level;
@@ -544,7 +709,7 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 {
 	PyObject * module;
 
-	if(PyType_Ready(&mwcollectd_NetworkEndpointTimeoutsType) < 0
+	if(PyType_Ready(&mwcollectd_NetworkEndpointTimeoutsType) < 0 || PyType_Ready(&mwcollectd_EventSubscriptionType) < 0
 		|| PyType_Ready(&mwcollectd_NetworkEndpointType) < 0 || PyType_Ready(&mwcollectd_NetworkServerType) < 0)
 	{
 		return 0;
@@ -568,6 +733,9 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 	
 	Py_INCREF(&mwcollectd_NetworkServerType);
 	PyModule_AddObject(module, "NetworkServer", (PyObject *) &mwcollectd_NetworkServerType);
+	
+	Py_INCREF(&mwcollectd_EventSubscriptionType);
+	PyModule_AddObject(module, "EventSubscription", (PyObject *) &mwcollectd_EventSubscriptionType);
 
 	return module;
 }
