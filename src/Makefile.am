@@ -24,6 +24,7 @@ SUBDIRS = core \
 	  $(shellcode_libemu_dir) \
 	  $(embed_python_dir) \
 	  log-file \
-	  filestore-binaries
+	  filestore-binaries \
+	  download-tftp
 
 EXTRA_DIST = README

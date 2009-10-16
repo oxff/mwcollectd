@@ -431,6 +431,7 @@ AC_OUTPUT([
 	src/embed-python/Makefile
 	src/log-file/Makefile
 	src/filestore-binaries/Makefile
+	src/download-tftp/Makefile
 	])
 
 
