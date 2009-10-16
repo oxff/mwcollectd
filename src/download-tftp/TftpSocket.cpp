@@ -148,7 +148,7 @@ void TftpSocket::pollRead()
 	switch(ntohs(* (uint16_t *) pktbuffer))
 	{
 		case 3:
-			if(ntohs(* (uint16_t *) pktbuffer) != m_ackId + 1)
+			if(ntohs(* (uint16_t *) &pktbuffer[sizeof(uint16_t)]) != m_ackId + 1)
 			{
 				GLOG(L_SPAM, "Ignoring out of order TFTP packet from %s/%s: %04hx != %04hx.",
 					inet_ntoa(peer.sin_addr), m_filename.c_str(), ntohs(* (uint16_t *) pktbuffer),

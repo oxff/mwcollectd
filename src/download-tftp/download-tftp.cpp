@@ -107,6 +107,7 @@ void DownloadTftpModule::transferFailed(TftpSocket * socket)
 	if(!--m_refcount && m_shuttingDown)
 		m_daemon->stop();
 
+	m_daemon->getNetworkManager()->removeSocket(socket);
 	delete socket;
 }
 
@@ -115,6 +116,7 @@ void DownloadTftpModule::transferSucceeded(TftpSocket * socket, const string& fi
 	if(!--m_refcount && m_shuttingDown)
 		m_daemon->stop();
 
+	m_daemon->getNetworkManager()->removeSocket(socket);
 	delete socket;
 
 	LOG(L_INFO, "%s: %u bytes", __PRETTY_FUNCTION__, file.size());
