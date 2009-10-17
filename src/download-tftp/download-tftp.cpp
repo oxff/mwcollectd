@@ -79,7 +79,8 @@ void DownloadTftpModule::handleEvent(Event * event)
 		return;
 	}
 
-	TftpSocket * socket = new TftpSocket(this, peer.s_addr, url.substr(it - url.begin()).c_str());
+	TftpSocket * socket = new TftpSocket(this, (StreamRecorder *) (* event)["recorder"].getPointerValue(),
+		peer.s_addr, url.substr(it - url.begin()).c_str());
 
 	if(socket->sendRequest())
 	{
@@ -119,7 +120,16 @@ void DownloadTftpModule::transferSucceeded(TftpSocket * socket, const string& fi
 	m_daemon->getNetworkManager()->removeSocket(socket);
 	delete socket;
 
-	LOG(L_INFO, "%s: %u bytes", __PRETTY_FUNCTION__, file.size());
+	{
+		Event ev = Event("shellcode.file");
+
+		socket->getRecorder()->setProperty(("file:" + socket->getFilename()).c_str(), file);
+
+		ev["recorder"] = (void *) socket->getRecorder();
+		ev["name"] =  socket->getFilename();
+
+		m_daemon->getEventManager()->fireEvent(&ev);
+	}
 }
 
 EXPORT_LIBNETWORKD_MODULE(DownloadTftpModule, Daemon *);

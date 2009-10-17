@@ -193,7 +193,7 @@ void EmulatorSession::addDirectDownload(const char * url, const char * filename)
 		m_recorder, url, filename);
 
 	m_recorder->setProperty("url", url);
-	m_recorder->setProperty("localfile", filename);
+	m_recorder->setProperty((string("localfile:") + url).c_str(), filename);
 
 	{
 		Event ev = Event("shellcode.download");

@@ -39,10 +39,11 @@ class DownloadTftpModule;
 class TftpSocket : public IOSocket, TimeoutReceiver
 {
 public:
-	TftpSocket(DownloadTftpModule * parent, uint32_t address, const string& filename)
-		: m_socket(-1)
+	TftpSocket(DownloadTftpModule * parent, StreamRecorder * recorder,
+		uint32_t address, const string& filename)
+			: m_socket(-1)
 	{ m_address = address; m_filename = filename; m_ioSocketState = IOSOCKSTAT_IGNORE;
-		m_parent = parent; m_timeout = TIMEOUT_EMPTY; }
+		m_parent = parent; m_timeout = TIMEOUT_EMPTY; m_recorder = recorder; }
 	virtual ~TftpSocket();
 
 	bool sendRequest();
@@ -55,6 +56,12 @@ public:
 
 	inline int getSocket() const
 	{ return m_socket; }
+
+	inline StreamRecorder * getRecorder() const
+	{ return m_recorder; }
+
+	const string& getFilename() const
+	{ return m_filename; }
 
 protected:
 	void sendAck();
@@ -69,6 +76,7 @@ private:
 	string m_dataBuffer;
 	Timeout m_timeout;
 	size_t m_successiveTimeouts;
+	StreamRecorder * m_recorder;
 };
 
 class DownloadTftpModule : public Module, public EventSubscriber
