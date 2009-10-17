@@ -16,6 +16,10 @@ if PYTHON_MODULE
 embed_python_dir = embed-python
 endif
 
+if CURL_MODULE
+download_curl_dir = download-curl
+endif
+
 SUBDIRS = core \
 	  log-irc \
 	  $(dynserv_nfqueue_dir) \
@@ -25,6 +29,7 @@ SUBDIRS = core \
 	  $(embed_python_dir) \
 	  log-file \
 	  filestore-binaries \
-	  download-tftp
+	  download-tftp \
+	  $(download_curl_dir)
 
 EXTRA_DIST = README

@@ -210,6 +210,58 @@ AC_DEFUN([CHECK_CRYPTO],
 CHECK_CRYPTO()
 
 
+dnl **************************************************
+dnl * libcurl Support                                *
+dnl **************************************************
+enable_curl="yes"
+
+AC_ARG_ENABLE(curl, [  --enable-curl    enable http / ftp support via libcurl [[default yes]]], [do_enable_curl=$enableval])
+
+AC_ARG_WITH(curl-include,
+    [  --with-curl-include=PATH	specify path to curl include files],
+    [curl_inc=$withval],
+    [curl_inc=no])
+
+AC_ARG_WITH(curl-lib,
+    [  --with-curl-lib=PATH	specify path to curl client library],
+    [curl_lib=$withval],
+    [curl_lib=no])
+
+if test x$enable_curl = "xyes"; then
+    enable_curl="yes"
+
+    AC_PATH_PROG(LIBCURL_CONFIG, curl-config, no)
+    if test "$LIBCURL_CONFIG" = "no" ; then
+	AC_MSG_WARN([libcurl curl-config was not found in PATH])
+    fi
+
+    orig_cppflags=$CPPFLAGS
+    orig_libs=$LIBS
+    
+    if test "x$curl_inc" != xno; then
+      CPPFLAGS="-I$curl_inc $CPPFLAGS"
+    fi
+
+    if test "x$curl_lib" != "xno"; then
+        LDFLAGS="-L$curl_lib $LDFLAGS"
+    fi
+    
+    CPPFLAGS+="$CPPFLAGS `curl-config --cflags`"
+    LIBS+="$LIBS `curl-config --libs`"
+    
+    AC_CHECK_LIB([curl], [curl_version],
+             [AC_DEFINE(HAVE_LIBCURL, 1,
+                       [Define if you want to use libcurl])
+             LIB_CURL="`curl-config --libs` -lcurl"],
+             [enable_libcurl="no"])
+
+    AC_SUBST(LIB_CURL)
+
+    CPPFLAGS=$orig_cppflags
+    LIBS=$orig_libs
+fi
+
+
 AC_DEFUN([ACX_PTHREAD], [
 AC_REQUIRE([AC_CANONICAL_HOST])
 AC_LANG_SAVE
@@ -414,6 +466,7 @@ ACX_PTHREAD( [LIBS="$PTHREAD_LIBS $LIBS"
 AM_CONDITIONAL(LIBEMU_MODULE, [test x$enable_libemu = "xyes"])
 AM_CONDITIONAL(NFQ_MODULE, [test x$enable_nfq = "xyes"])
 AM_CONDITIONAL(PYTHON_MODULE, [test x$enable_python = "xyes"])
+AM_CONDITIONAL(CURL_MODULE, [test x$enable_curl = "xyes"])
 
 
 
@@ -432,6 +485,7 @@ AC_OUTPUT([
 	src/log-file/Makefile
 	src/filestore-binaries/Makefile
 	src/download-tftp/Makefile
+	src/download-curl/Makefile
 	])
 
 
@@ -445,4 +499,8 @@ fi
 
 if test x"$enable_python" != "xyes"; then
 	AC_MSG_WARN([python3 not enabled/found, no service emulation possible!])
+fi
+
+if test x"$enable_curl" != "xyes"; then
+	AC_MSG_WARN([libcurl not enabled/found, you cannot download http / ftp URLs!])
 fi
