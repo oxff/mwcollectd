@@ -95,6 +95,8 @@ void FileStoreBinariesModule::handleEvent(Event * event)
 	uint8_t * data = new uint8_t[dataref.size()];
 	memcpy(data, dataref.data(), dataref.size());
 
+	recorder->acquire();
+
 	m_queue.push_back(pair<StreamRecorder *, string>( recorder, name));	
 	m_daemon->getHashManager()->computeHash(this, m_hashType, data, dataref.size());
 }
