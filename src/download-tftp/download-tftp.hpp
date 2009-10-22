@@ -43,7 +43,7 @@ public:
 		uint32_t address, const string& filename)
 			: m_socket(-1)
 	{ m_address = address; m_filename = filename; m_ioSocketState = IOSOCKSTAT_IGNORE;
-		m_parent = parent; m_timeout = TIMEOUT_EMPTY; m_recorder = recorder; }
+		m_parent = parent; m_timeout = TIMEOUT_EMPTY; m_recorder = recorder; m_recorder->acquire(); }
 	virtual ~TftpSocket();
 
 	bool sendRequest();

@@ -44,6 +44,8 @@ TftpSocket::~TftpSocket()
 {
 	if(m_timeout != TIMEOUT_EMPTY)
 		g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
+
+	m_recorder->release();
 }
 
 bool TftpSocket::sendRequest()
