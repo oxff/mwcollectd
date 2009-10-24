@@ -108,7 +108,7 @@ void TftpSocket::sendAck()
 	} __attribute__((packed)) packet;
 
 	packet.opcode = htons(4);
-	packet.block = m_ackId;
+	packet.block = htons(m_ackId);
 
 	struct sockaddr_in peer;
 
