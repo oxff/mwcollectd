@@ -31,6 +31,8 @@
 
 TransferSession::TransferSession(Daemon * daemon, DownloadCurlModule * handler, StreamRecorder * rec)
 {
+	m_type = ST_SHELLCODE;
+
 	m_daemon = daemon;
 	m_handler = handler;
 	m_recorder = rec;
@@ -46,9 +48,29 @@ TransferSession::TransferSession(Daemon * daemon, DownloadCurlModule * handler, 
 	m_postInfo = m_postInfoLast = 0;
 }
 
+TransferSession::TransferSession(Daemon * daemon, DownloadCurlModule * handler, const string& typeName)
+{
+	m_type = ST_GENERIC;
+
+	m_daemon = daemon;
+	m_handler = handler;
+	m_recorder = 0;
+
+	m_typeName = typeName;
+	
+	if(!(m_curlHandle = curl_easy_init()) || !(m_multiHandle =
+		curl_multi_init()))
+	{
+		ASSERT(false);
+	}
+	
+	m_postInfo = m_postInfoLast = 0;
+}
+
 TransferSession::~TransferSession()
 {
-	m_recorder->release();
+	if(m_type == ST_SHELLCODE)
+		m_recorder->release();
 
 	if(m_multiHandle)
 		curl_multi_remove_handle(m_multiHandle, m_curlHandle);

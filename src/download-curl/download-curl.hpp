@@ -48,6 +48,7 @@ class TransferSession : public IOSocket
 {
 public:	
 	TransferSession(Daemon * daemon, DownloadCurlModule * handler, StreamRecorder * recorder);
+	TransferSession(Daemon * daemon, DownloadCurlModule * handler, const string& typeName);
 	~TransferSession();
 	
 	virtual void pollRead();
@@ -59,11 +60,21 @@ public:
 	void abort();
 
 	inline StreamRecorder * getRecorder() const { return m_recorder; }
+	inline const string& getTypeName() const { return m_typeName; }
 	
 	inline void setUrl(const string& url) { m_url = url; }
 	inline void setUserAgent(string ua) { m_userAgent = ua; }
 	inline const string& getUrl() const { return m_url; }
 	inline string getFilename() const { return m_url.substr(m_url.find('/', 9)); }
+
+	enum SessionType
+	{
+		ST_SHELLCODE,
+		ST_GENERIC,
+	};
+
+	inline SessionType getType() const { return m_type; }
+
 
 protected:	
 	static size_t readData(void *buffer, size_t size, size_t n, void *data);
@@ -82,6 +93,9 @@ private:
 	DownloadCurlModule * m_handler;
 
 	StreamRecorder * m_recorder;
+	string m_typeName;
+
+	SessionType m_type;
 	
 private:
 	string m_url, m_userAgent;
