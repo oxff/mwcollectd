@@ -17,7 +17,7 @@ embed_python_dir = embed-python
 endif
 
 if CURL_MODULE
-download_curl_dir = download-curl
+download_curl_dir = download-curl submit-mwserv
 endif
 
 SUBDIRS = core \

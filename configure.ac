@@ -486,6 +486,7 @@ AC_OUTPUT([
 	src/filestore-binaries/Makefile
 	src/download-tftp/Makefile
 	src/download-curl/Makefile
+	src/submit-mwserv/Makefile
 	])
 
 
@@ -503,4 +504,5 @@ fi
 
 if test x"$enable_curl" != "xyes"; then
 	AC_MSG_WARN([libcurl not enabled/found, you cannot download http / ftp URLs!])
+	AC_MSG_WARN([libcurl not enabled/found, submit-mwserv not available!])
 fi
