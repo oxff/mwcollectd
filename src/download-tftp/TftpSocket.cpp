@@ -69,14 +69,14 @@ bool TftpSocket::sendRequest()
 		m_ackId = 0;
 	
 		m_successiveTimeouts = 1;
-		g_daemon->getTimeoutManager()->scheduleTimeout(3, this);
+		m_timeout = g_daemon->getTimeoutManager()->scheduleTimeout(3, this);
 	}
 
-	size_t size = sizeof(uint16_t) + (m_filename.size() + 1) + 6;
+	size_t size = sizeof(uint16_t) + (m_filename.size() + 2) + 6;
 	uint8_t request[size];
 
 	* (uint16_t *) request = htons(1);
-	strcpy((char *) &request[sizeof(uint16_t)], m_filename.c_str());
+	strcpy((char *) &request[sizeof(uint16_t)], ("/" + m_filename).c_str());
 	strcpy((char *) &request[size - 6], "octet");
 
 	struct sockaddr_in peer;

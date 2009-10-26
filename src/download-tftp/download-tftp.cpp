@@ -114,12 +114,6 @@ void DownloadTftpModule::transferFailed(TftpSocket * socket)
 
 void DownloadTftpModule::transferSucceeded(TftpSocket * socket, const string& file)
 {
-	if(!--m_refcount && m_shuttingDown)
-		m_daemon->stop();
-
-	m_daemon->getNetworkManager()->removeSocket(socket);
-	delete socket;
-
 	{
 		Event ev = Event("shellcode.file");
 
@@ -130,6 +124,12 @@ void DownloadTftpModule::transferSucceeded(TftpSocket * socket, const string& fi
 
 		m_daemon->getEventManager()->fireEvent(&ev);
 	}
+
+	if(!--m_refcount && m_shuttingDown)
+		m_daemon->stop();
+
+	m_daemon->getNetworkManager()->removeSocket(socket);
+	delete socket;
 }
 
 EXPORT_LIBNETWORKD_MODULE(DownloadTftpModule, Daemon *);
