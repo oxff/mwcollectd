@@ -120,7 +120,8 @@ void DownloadTftpModule::transferSucceeded(TftpSocket * socket, const string& fi
 		socket->getRecorder()->setProperty(("file:" + socket->getFilename()).c_str(), file);
 
 		ev["recorder"] = (void *) socket->getRecorder();
-		ev["name"] =  socket->getFilename();
+		ev["name"] = socket->getFilename();
+		ev["url"] = socket->getUrl();
 
 		m_daemon->getEventManager()->fireEvent(&ev);
 	}

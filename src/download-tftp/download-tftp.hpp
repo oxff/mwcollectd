@@ -60,8 +60,11 @@ public:
 	inline StreamRecorder * getRecorder() const
 	{ return m_recorder; }
 
-	const string& getFilename() const
+	inline const string& getFilename() const
 	{ return m_filename; }
+
+	inline string getUrl() const
+	{ return (string("tftp://") + inet_ntoa(* (struct in_addr *) &m_address) + "/" + m_filename).c_str(); }
 
 protected:
 	void sendAck();
