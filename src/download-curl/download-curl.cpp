@@ -143,7 +143,8 @@ void DownloadCurlModule::transferSucceeded(TransferSession * socket,
 			socket->getRecorder()->setProperty(("file:" + socket->getFilename()).c_str(), response);
 
 			ev["recorder"] = (void *) socket->getRecorder();
-			ev["name"] =  socket->getFilename();
+			ev["name"] = socket->getFilename();
+			ev["url"] = socket->getUrl();
 
 			m_daemon->getEventManager()->fireEvent(&ev);
 			break;
