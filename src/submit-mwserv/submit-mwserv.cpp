@@ -77,10 +77,9 @@ bool SubmitMwservModule::start(Configuration * config)
 	m_retryInterval = config->getInteger(":retry-interval", 180);
 
 
-
 	if(!m_daemon->getEventManager()->subscribeEventMask("download.result.success", this)
 		|| !m_daemon->getEventManager()->subscribeEventMask("download.result.failure", this)
-		|| !m_daemon->getEventManager()->subscribeEventMask("snoop.download", this))
+		|| !m_daemon->getEventManager()->subscribeEventMask("shellcode.file", this))
 	{
 		return false;
 	}
@@ -99,11 +98,18 @@ bool SubmitMwservModule::stop()
 		m_heartbeatTimeout = TIMEOUT_EMPTY;
 	}
 
-	if(!m_daemon->getEventManager()->unsubscribeEventMask("download.result.success", this)
-		|| !m_daemon->getEventManager()->unsubscribeEventMask("download.result.failure", this))
+	if(!m_pendingInstances.empty())
+		m_daemon->getHashManager()->dropReceiver(this);
+
+	for(PendingInstanceInfo * info = m_pendingInstances.front(); !m_pendingInstances.empty();
+		info = m_pendingInstances.front(), m_pendingInstances.pop())
 	{
-		return false;
+		delete info;
 	}
+
+	m_daemon->getEventManager()->unsubscribeEventMask("download.result.success", this);
+	m_daemon->getEventManager()->unsubscribeEventMask("download.result.failure", this);
+	m_daemon->getEventManager()->unsubscribeEventMask("shellcode.file", this);
 
 	return true;
 }
@@ -111,6 +117,9 @@ bool SubmitMwservModule::stop()
 void SubmitMwservModule::timeoutFired(Timeout t)
 {
 	m_heartbeatTimeout = TIMEOUT_EMPTY;
+
+	string software = m_daemon->getVersion();
+	software.erase(software.rfind('[') - 1);
 
 	Event ev = Event("download.request");
 
@@ -120,9 +129,11 @@ void SubmitMwservModule::timeoutFired(Timeout t)
 	ev["post:guid"] = m_guid;
 	ev["post:maintainer"] = m_maintainer;
 	ev["post:secret"] = m_secret;
-	ev["post:software"] = m_daemon->getVersion();
+	ev["post:software"] = software;
+
 	ev["postfields"] = "guid,maintainer,secret,software";
-	
+
+
 	m_daemon->getEventManager()->fireEvent(&ev);
 }
 
@@ -170,7 +181,7 @@ void SubmitMwservModule::handleEvent(Event * ev)
 
 				Event httpev = Event("download.request");
 
-				httpev["url"] = m_url + "botsnoopd/submit";
+				httpev["url"] = m_url + "mwcollectd/submit";
 				httpev["type"] = "submit-mwserv.sample";
 
 				httpev["post:guid"] = m_guid;
@@ -178,15 +189,23 @@ void SubmitMwservModule::handleEvent(Event * ev)
 				httpev["post:secret"] = m_secret;
 
 				httpev["post:sha512"] = info->sha512;
+				httpev["post:url"] = info->url;
+				httpev["post:name"] = info->name;
 				httpev["post:data"] = info->data;
 
-				httpev["postfields"] = "guid,maintainer,secret,sha512,data";
+				httpev["post:saddr"] = info->recorder->getSource().name;
+				httpev["post:sport"] = info->recorder->getSource().port;
+				httpev["post:daddr"] = info->recorder->getDestination().name;
+				httpev["post:dport"] = info->recorder->getDestination().port;
+
+				httpev["postfields"] = "guid,maintainer,secret,sha512,url,name,data,saddr,sport,daddr,dport";
 
 				m_daemon->getEventManager()->fireEvent(&httpev);
 			}
 			else if(* (* ev)["response"] != "OK")
 				LOG(L_CRIT, "Unknown response from mwserv: \"%s\"!", (* ev)["response"].getStringValue().c_str());
 
+			info->recorder->release();
 			delete info;
 		}
 	}
@@ -206,9 +225,10 @@ void SubmitMwservModule::handleEvent(Event * ev)
 		{
 			PendingInstanceInfo * info = (PendingInstanceInfo *) (* ev)["opaque"].getPointerValue();
 
-			LOG(L_CRIT, "Submiting instance of \"%s\" from \"%s\", \"%s\" to mwserv failed.",
-				info->sha512.c_str(), info->network.c_str(), info->location.c_str());
+			LOG(L_CRIT, "Submiting instance of \"%s\" from \"%s\" to mwserv failed.",
+				info->sha512.c_str(), info->url.c_str());
 
+			info->recorder->release();
 			delete info;
 
 			
@@ -220,7 +240,7 @@ void SubmitMwservModule::handleEvent(Event * ev)
 		}
 		else if(* (* ev)["type"] == "submit-mwserv.sample")
 		{
-			LOG(L_CRIT, "Sample upload to mweserv failed, disabling mwserv temporarily...");
+			LOG(L_CRIT, "Sample upload to mwserv failed, disabling mwserv temporarily...");
 
 			if(m_heartbeatTimeout != TIMEOUT_EMPTY)
 				m_daemon->getTimeoutManager()->dropTimeout(m_heartbeatTimeout);
@@ -231,38 +251,72 @@ void SubmitMwservModule::handleEvent(Event * ev)
 	}
 	else if(ev->getName() == "shellcode.file")
 	{
-		if(!m_serverAvailable)
-		{
-			LOG(L_SPAM, "Ignoring submission of \"%s\" instance since server is unavailable.",
-				(* ev)["sha512"].getStringValue().c_str());
-
-			return;
-		}
-
 		PendingInstanceInfo * info = new PendingInstanceInfo;
+		StreamRecorder * recorder = (StreamRecorder *) (* ev)["recorder"].getPointerValue();
 
-		info->sha512 = * (* ev)["sha512"];
-		info->network = * (* ev)["network"];
-		info->location = * (* ev)["location"];
-		info->data = string((char *) (* ev)["data"].getPointerValue(), (* ev)["datasize"].getIntegerValue());
+		info->name = * (* ev)["name"];
+		info->data = recorder->getProperty(("file:" + info->name).c_str());
+		info->url = * (* ev)["url"];
 
+		info->recorder = recorder;
+		recorder->acquire();
 
-		Event httpev = Event("download.request");
-
-		httpev["url"] = m_url + "botsnoopd/submit";
-		httpev["type"] = "submit-mwserv.instance";
-		httpev["opaque"] = (void *) info;
-
-		httpev["post:guid"] = m_guid;
-		httpev["post:maintainer"] = m_maintainer;
-		httpev["post:secret"] = m_secret;
-
-		httpev["post:sha512"] = * (* ev)["sha512"];
-
-		httpev["postfields"] = "guid,maintainer,secret,sha512,network,location";
-
-		m_daemon->getEventManager()->fireEvent(&httpev);
+		m_pendingInstances.push(info);
+		m_daemon->getHashManager()->computeHash(this, HT_SHA2_512, (uint8_t *) info->data.data(), info->data.size());
 	}
+}
+		
+
+void SubmitMwservModule::hashComputed(HashType type, uint8_t * data,
+	unsigned int dataLength, uint8_t * hash, unsigned int hashLength)
+{
+	char hexhash[hashLength * 2 + 1];
+
+	{
+		for(unsigned int k = 0; k < hashLength; ++k)
+			sprintf(&hexhash[k << 1], "%02hx", hash[k]);
+
+		hexhash[hashLength << 1] = 0;
+	}
+
+	PendingInstanceInfo * info = m_pendingInstances.front();
+	m_pendingInstances.pop();
+	
+	if(!m_serverAvailable)
+	{
+		LOG(L_SPAM, "Ignoring submission of \"%s\" instance since server is unavailable.", hexhash);
+
+		info->recorder->release();
+		delete info;
+
+		return;
+	}
+
+	info->sha512 = hexhash;
+
+
+	Event httpev = Event("download.request");
+
+	httpev["url"] = m_url + "mwcollectd/submit";
+	httpev["type"] = "submit-mwserv.instance";
+	httpev["opaque"] = (void *) info;
+
+	httpev["post:guid"] = m_guid;
+	httpev["post:maintainer"] = m_maintainer;
+	httpev["post:secret"] = m_secret;
+
+	httpev["post:sha512"] = string(hexhash);
+	httpev["post:url"] = info->url;
+	httpev["post:name"] = info->name;
+
+	httpev["post:saddr"] = info->recorder->getSource().name;
+	httpev["post:sport"] = info->recorder->getSource().port;
+	httpev["post:daddr"] = info->recorder->getDestination().name;
+	httpev["post:dport"] = info->recorder->getDestination().port;
+
+	httpev["postfields"] = "guid,maintainer,secret,sha512,url,name,saddr,sport,daddr,dport";
+
+	m_daemon->getEventManager()->fireEvent(&httpev);
 }
 
 

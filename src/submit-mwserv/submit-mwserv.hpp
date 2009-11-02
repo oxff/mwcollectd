@@ -29,13 +29,16 @@
 #include <mwcollectd.hpp>
 using namespace mwcollectd;
 
+#include <queue>
+using namespace std;
+
 
 #ifndef __MWCOLLECTD_SUBMITMWSERV_HPP
 #define __MWCOLLECTD_SUBMITMWSERV_HPP
 
 
 class SubmitMwservModule : public Module, public EventSubscriber,
-	public TimeoutReceiver
+	public TimeoutReceiver, public HashReceiver
 {
 public:
 	SubmitMwservModule(Daemon * daemon);	
@@ -52,10 +55,14 @@ public:
 	
 	virtual void handleEvent(Event * firedEvent);
 
+	virtual void hashComputed(HashType type, uint8_t * data,
+		unsigned int dataLength, uint8_t * hash, unsigned int hashLength);
+
 protected:
 	struct PendingInstanceInfo
 	{
-		string sha512, network, location;
+		StreamRecorder * recorder;
+		string sha512, name, url;
 		string data;
 	};
 
@@ -63,6 +70,8 @@ private:
 	Daemon * m_daemon;
 
 	string m_guid, m_maintainer, m_secret, m_url;
+
+	queue<PendingInstanceInfo *> m_pendingInstances;
 
 	Timeout m_heartbeatTimeout;
 	bool m_serverAvailable;
