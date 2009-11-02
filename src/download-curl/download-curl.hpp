@@ -75,6 +75,9 @@ public:
 
 	inline SessionType getType() const { return m_type; }
 
+	inline void * getOpaque() const { return m_opaque; }
+	inline void setOpaque(void * o) { m_opaque = o; }
+
 
 protected:	
 	static size_t readData(void *buffer, size_t size, size_t n, void *data);
@@ -92,7 +95,11 @@ private:
 	Daemon * m_daemon;
 	DownloadCurlModule * m_handler;
 
-	StreamRecorder * m_recorder;
+	union {
+		StreamRecorder * m_recorder;
+		void * m_opaque;
+	};
+
 	string m_typeName;
 
 	SessionType m_type;

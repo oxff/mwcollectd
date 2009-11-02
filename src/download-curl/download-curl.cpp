@@ -94,6 +94,9 @@ void DownloadCurlModule::handleEvent(Event * event)
 				socket->addPostField(fields, * (* event)["post:" + fields]);
 		}
 
+		if(event->hasAttribute("opaque"))
+			socket->setOpaque((* event)["opaque"].getPointerValue());
+
 		socket->initiate();
 	}
 }
@@ -146,6 +149,9 @@ void DownloadCurlModule::transferSucceeded(TransferSession * socket,
 			ev["name"] = socket->getFilename();
 			ev["url"] = socket->getUrl();
 
+			if(socket->getOpaque())
+				ev["opaque"] = socket->getOpaque();
+
 			m_daemon->getEventManager()->fireEvent(&ev);
 			break;
 		}
@@ -157,6 +163,9 @@ void DownloadCurlModule::transferSucceeded(TransferSession * socket,
 			ev["type"] = socket->getTypeName();
 			ev["url"] = socket->getUrl();
 			ev["response"] = response;
+
+			if(socket->getOpaque())
+				ev["opaque"] = socket->getOpaque();
 
 			m_daemon->getEventManager()->fireEvent(&ev);
 			break;

@@ -54,7 +54,7 @@ TransferSession::TransferSession(Daemon * daemon, DownloadCurlModule * handler, 
 
 	m_daemon = daemon;
 	m_handler = handler;
-	m_recorder = 0;
+	m_opaque = 0;
 
 	m_typeName = typeName;
 	
