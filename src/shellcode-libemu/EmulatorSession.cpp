@@ -310,6 +310,7 @@ void EmulatorSession::closeHandle(uint32_t handle)
 
 		ev["recorder"] = (void *) m_recorder;
 		ev["name"] = it->second.name;
+		ev["url"] = "shellcode://";
 
 		m_daemon->getEventManager()->fireEvent(&ev);
 	}
