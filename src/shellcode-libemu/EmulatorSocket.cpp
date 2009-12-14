@@ -53,6 +53,8 @@ void EmulatorSocket::pollRead()
 			m_state = SS_CONNECTED;
 			m_ioSocketState = IOSOCKSTAT_IGNORE;
 
+			GLOG(L_SPAM, "Connection established for %p/%p.", this, m_session->getRecorder());
+
 			break;
 		}
 
@@ -141,6 +143,10 @@ void EmulatorSocket::pollError()
 	m_session->socketWakeup(-1);
 	m_state = SS_UNINIT;
 	m_ioSocketState = IOSOCKSTAT_IGNORE;
+
+	recv(m_fd, 0, 0, 0);
+
+	GLOG(L_INFO, "%p/%p had a connection error: %s", this, m_session->getRecorder(), strerror(errno));
 }
 
 void EmulatorSocket::pollWrite()
@@ -259,10 +265,15 @@ int EmulatorSocket::connect(uint32_t address, uint16_t port)
 
 	int res = ::connect(m_fd, (struct sockaddr *) &addr, sizeof(addr));
 
+	GLOG(L_INFO, "%p/%p attempts connection to %s:%hu!", this, m_session->getRecorder(), inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+
 	if(res < 0)
 	{
 		if(!(errno == EAGAIN || errno == EINPROGRESS))
+		{
+			GLOG(L_INFO, "connect(..) on %p/%p failed: %s.", this, m_session->getRecorder(), strerror(errno));
 			return -1;
+		}		
 
 		m_state = SS_CONNECTING;
 		m_ioSocketState = IOSOCKSTAT_IDLE;

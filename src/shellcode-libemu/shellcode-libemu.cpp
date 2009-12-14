@@ -97,7 +97,6 @@ bool ShellcodeLibemuModule::stop()
 		if(!m_testQueue.empty())
 		{
 			pthread_mutex_unlock(&m_testQueueMutex);
-			LOG(L_CRIT, __PRETTY_FUNCTION__);
 
 			m_exiting = true;
 			return false;
