@@ -119,7 +119,7 @@ void SubmitMwservModule::timeoutFired(Timeout t)
 	m_heartbeatTimeout = TIMEOUT_EMPTY;
 
 	string software = m_daemon->getVersion();
-	software.erase(software.rfind('[') - 1);
+	software.erase(software.find(','));
 
 	Event ev = Event("download.request");
 
