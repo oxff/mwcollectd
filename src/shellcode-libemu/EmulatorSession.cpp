@@ -46,9 +46,6 @@ EmulatorSession::EmulatorSession(const uint8_t * data, size_t size,
 	m_emu = emu_new();
 	m_env = emu_env_new(m_emu);
 
-	if(!timeoutLimit)
-		timeoutLimit = 120;
-
 	m_steps = 0;
 	m_active = true;
 	m_sockfdCounter = 1952;
@@ -348,7 +345,6 @@ void EmulatorSession::timeoutFired(Timeout t)
 {
 	if(m_Timeout == t)
 	{
-		LOG(L_CRIT, __PRETTY_FUNCTION__);
 		m_active = true;
 		m_Timeout = TIMEOUT_EMPTY;
 	}

@@ -55,8 +55,10 @@ bool ShellcodeLibemuModule::start(Configuration * config)
 	if(config)
 	{
 		threads = config->getInteger(":threads", 0);
-		m_timeLimit = config->getInteger(":time-limit", 300);
+		m_timeLimit = config->getInteger(":time-limit", 120);
 	}
+	else
+		m_timeLimit = 120;
 
 	if(!threads)
 	{
