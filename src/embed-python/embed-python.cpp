@@ -298,6 +298,10 @@ void EmbedPythonModule::logError()
 
 		Py_DECREF(module);
 	}
+
+	Py_XDECREF(type);
+	Py_XDECREF(value);
+	Py_XDECREF(traceback);
 }
 
 bool EmbedPythonModule::stop()
