@@ -67,9 +67,8 @@ bool DynamicServerNfqueue::start(Configuration * moduleConfiguration)
 
 	if(nfq_unbind_pf(m_netfilterHandle, AF_INET) != 0)
 	{
-		LOG(L_CRIT, "Could not unbind AF_INET from NFQUEUE handle: %s",
+		LOG(L_INFO, "Could not unbind AF_INET from NFQUEUE handle: %s (can be caused by recent kernels)",
 			strerror(errno));
-		return false;
 	}
 
 	if(nfq_bind_pf(m_netfilterHandle, AF_INET) != 0)
