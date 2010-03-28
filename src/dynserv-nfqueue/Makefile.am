@@ -3,7 +3,7 @@
 
 AUTOMAKE_OPTIONS = foreign
 
-AM_CXXFLAGS = -Wall -Werror -Wno-deprecated -I../include/
+AM_CXXFLAGS = -Wall -Werror -Wno-deprecated -Wno-strict-aliasing -I../include/
 AM_LDFLAGS =
 
 pkglib_LTLIBRARIES = dynserv-nfqueue.la
