@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
-import sys, getopt, getpass, socket, threading
+import sys, getopt, getpass, socket, threading, glob, re
 import paramiko
 from select import select
+from os.path import basename
 
 
 def usage():
@@ -11,6 +12,15 @@ def usage():
    -u <username>	Use <username> for login
    -k <filename>	Use private key file <filename> besides keys in  ~/.ssh
    -p <password>	Use <password> for login
+   -C <configlob>	Push all configuration files matching <confglob>
+Possible actions are:
+   clear                Remove all source directories (does not touch bins)
+   fetch                Create source directories and fetch latest from GIT
+   deps                 Install build- & runtime dependencies (Ubuntu specific)
+   autoconf             autoreconf; configure
+   build                make; make install
+   up                   Check if mwcollectd is running and if not start it
+   conf                 Upload configuration from local host
 """ % sys.argv[0])
 	sys.exit(0)
 
@@ -44,8 +54,7 @@ class SshThread(threading.Thread):
 			
 			if stdout.channel in excset:
 				break
-
-		print self.name, 'is done'
+		
 		return (out, err)
 
 
@@ -64,24 +73,49 @@ class FetchThread(SshThread):
 class DependenciesThread(SshThread):
 	def run(self):
 		print 'Installing dependencies on %s ...' % self.name
-		print '\n'.join(self.execute('apt-get -yq install git-core gcc g++ make automake autoconf autotools-dev libcurl4-openssl-dev libnetfilter-queue-dev python3 python3-dev libtool'))
+		print '\n'.join(self.execute('apt-get -yq install git-core gcc g++ make automake autoconf autotools-dev libcurl4-openssl-dev libnetfilter-queue-dev python3 python3-dev libtool libudns-dev'))
+
+class AutoconfThread(SshThread):
+	def run(self):
+		for project in ['libnetworkd', 'libemu']:
+			print 'Configuring %s on %s ...' % (project, self.name)
+			print '\n'.join(self.execute('cd /usr/src/$NAME$; autoreconf -vi; ./configure --prefix=/opt/$NAME$'.replace('$NAME$', project)))
+		print 'Configuring mwcollectd on %s ...' % self.name
+		print '\n'.join(self.execute('cd /usr/src/$NAME$; autoreconf -vi; ./configure --prefix=/opt/$NAME$ --with-libnetworkd=/opt/libnetworkd --with-libemu=/opt/libemu'.replace('$NAME$', 'mwcollectd')))
 
 class BuildThread(SshThread):
 	def run(self):
-		for project in ['libnetworkd', 'libemu']:
+		for project in ['libnetworkd', 'libemu', 'mwcollectd']:
 			print 'Building %s on %s ...' % (project, self.name)
-			print '\n'.join(self.execute('cd /usr/src/$NAME$; autoreconf -vi; ./configure --prefix=/opt/$NAME$; make; make install'.replace('$NAME$', project)))
-		print 'Building mwcollectd on %s ...' % self.name
-		print '\n'.join(self.execute('cd /usr/src/$NAME$; autoreconf -vi; ./configure --prefix=/opt/$NAME$ --with-libnetworkd=/opt/libnetworkd --with-libemu=/opt/libemu; make; make install'.replace('$NAME$', 'mwcollectd')))
+			print '\n'.join(self.execute('cd /usr/src/$NAME$; make; make install'.replace('$NAME$', project)))
 
+class PushConfThread(SshThread):
+	def run(self):
+		sftp = self.client.open_sftp()
+
+		for file in glob.iglob(self.configdir):
+			print 'Transfering %s to %s...' % (basename(file), self.name)
+			sftp.put(file, '/opt/mwcollectd/etc/mwcollectd/' + basename(file))
+
+class CheckUpThread(SshThread):
+	def run(self):
+		(out, err) = self.execute('ps aux | grep mwcollectd')
+		instances = [ line for line in out.split('\n') if line.find('/sbin/mwcollectd') >= 0 ]
+		
+		if instances != [ ]:
+			print 'Already running on %s: %s' % (self.name, instances[0])
+		else:
+			print 'Starting on %s:' % self.name
+			print  '\n'.join(self.execute('cd /opt/mwcollectd; ./sbin/mwcollectd -c etc/mwcollectd/mwcollectd.conf'))
 
 if __name__ == '__main__':
 	username = getpass.getuser()
 	key = None
 	password = None
+	configdir = None
 
 	try:
-		(options, servers) = getopt.getopt(sys.argv[1:], 'k:p:u:')
+		(options, servers) = getopt.getopt(sys.argv[1:], 'k:p:u:C:')
 		action = servers[0]
 		servers = servers[1:]
 	except IndexError:
@@ -96,6 +130,8 @@ if __name__ == '__main__':
 			password = option[1]
 		elif option[0] == '-u':
 			username = option[1]
+		elif option[0] == '-C':
+			configdir = option[1]
 
 	if not len(servers):
 		sys.stderr.write("You have to specify at least one server.\n")
@@ -110,10 +146,16 @@ if __name__ == '__main__':
 			'clear': ClearThread,
 			'fetch': FetchThread,
 			'deps': DependenciesThread,
+			'autoconf': AutoconfThread,
 			'build': BuildThread,
+			'up': CheckUpThread,
+			'conf': PushConfThread,
 		}
 
 	if action not in modes:
+		usage()
+
+	if action == 'conf' and not configdir:
 		usage()
 
 	threads = [ ]
@@ -133,6 +175,9 @@ if __name__ == '__main__':
 			sys.exit(-1)
 
 		t = modes[action](client, server[0])
+
+		if configdir:
+			t.configdir = configdir
 
 		t.start()
 		threads.append(t)
