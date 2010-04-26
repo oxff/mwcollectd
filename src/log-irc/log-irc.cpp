@@ -89,12 +89,16 @@ bool IrcInterfaceModule::start(Configuration * moduleConfiguration)
 	if((pos = m_configuration.nickname.find("%")) != string::npos)
 	{
 		char hostname[64];
+		char * domain;
 
 		if(gethostname(hostname, sizeof(hostname)) != 0)
 		{
 			LOG(L_CRIT, "Could not obtain hostname: %s!", strerror(errno));
 			return false;
 		}
+
+		if((domain = strchr(hostname, '.')))
+			* domain = 0;
 
 		m_configuration.nickname = m_configuration.nickname.substr(0, pos)
 			+ hostname + m_configuration.nickname.substr(pos + 1);
