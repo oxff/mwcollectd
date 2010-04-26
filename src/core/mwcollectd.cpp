@@ -96,7 +96,7 @@ int main(int argc, char * argv[])
 
 		if(backgroundDaemon)
 		{
-			if(::daemon(0, 0) < 0)
+			if(::daemon(1, 0) < 0)
 			{
 				perror("daemon(..)'ize");
 				return -1;
