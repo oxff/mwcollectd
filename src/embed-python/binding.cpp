@@ -174,6 +174,7 @@ static PyObject * mwcollectd_NetworkEndpoint_close(PyObject *self, PyObject *arg
 	}
 
 	((mwcollectd_NetworkEndpoint *) self)->endpoint->close();
+	((mwcollectd_NetworkEndpoint *) self)->endpoint = 0;
 
 	Py_RETURN_NONE;
 }
