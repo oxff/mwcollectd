@@ -42,6 +42,7 @@ fi
 ])dnl AX_CHECK_COMPILER_FLAGS
 
 AX_CHECK_COMPILER_FLAGS([-pipe], [CXXFLAGS+=" -pipe"])
+AX_CHECK_COMPILER_FLAGS([-Wno-strict-aliasing], [CXXFLAGS+=" -Wno-strict-aliasing"])
 
 
 AC_CHECK_HEADERS([stdint.h stdlib.h string.h strings.h unistd.h])
