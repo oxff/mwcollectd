@@ -56,7 +56,7 @@ private:
 
 	HashType m_hashType;
 
-	list<pair<StreamRecorder *, string> > m_queue;
+	list<StreamRecorder *> m_queue;
 };
 
 

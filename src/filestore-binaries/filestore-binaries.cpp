@@ -89,27 +89,33 @@ bool FileStoreBinariesModule::start(Configuration * moduleConfiguration)
 void FileStoreBinariesModule::handleEvent(Event * event)
 {
 	StreamRecorder * recorder = (StreamRecorder *) (* event)["recorder"].getPointerValue();
-	string name = * (* event)["name"];
-	string dataref = recorder->getProperty(("file:" + name).c_str());
+	string dataref;
+
+	if(event->hasAttribute("data"))
+		dataref = * (* event)["data"];
+	else
+	{
+		string name = * (* event)["name"];
+		dataref = recorder->getProperty(("file:" + name).c_str());
+	}
 
 	uint8_t * data = new uint8_t[dataref.size()];
 	memcpy(data, dataref.data(), dataref.size());
 
 	recorder->acquire();
 
-	m_queue.push_back(pair<StreamRecorder *, string>( recorder, name));	
+	m_queue.push_back(recorder);
 	m_daemon->getHashManager()->computeHash(this, m_hashType, data, dataref.size());
 }
 
 void FileStoreBinariesModule::hashComputed(HashType type, uint8_t * data,
 	unsigned int dataLength, uint8_t * hash, unsigned int hashLength)
 {
-	StreamRecorder * recorder = m_queue.front().first;
-	string name = m_queue.front().second;
+	StreamRecorder * recorder = m_queue.front();
+	m_queue.pop_front();
 
 	char filename[hashLength * 2 + 1];
 
-	m_queue.pop_front();
 
 	{
 		for(unsigned int k = 0; k < hashLength; ++k)
