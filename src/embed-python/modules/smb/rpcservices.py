@@ -980,7 +980,8 @@ class SRVSVC(RPCService):
 		if resumehandleptr != 0:
 			resumehandle = x.unpack_long()
 		
-"""		print("srvsvc_handle_ref %x srvsvc_handle %s infostruct_level %i count %i buffer %x preferdmaxlen %i  resumehandleptr %x resumehandle %i" % (
+		"""		
+		print("srvsvc_handle_ref %x srvsvc_handle %s infostruct_level %i count %i buffer %x preferdmaxlen %i  resumehandleptr %x resumehandle %i" % (
 			srvsvc_handle_ref,
 			srvsvc_handle,
 			infostruct_level,
@@ -989,7 +990,7 @@ class SRVSVC(RPCService):
 			preferdmaxlen,
 			resumehandleptr,
 			resumehandle) )
-			"""
+		"""
 
 
 		# compile reply
