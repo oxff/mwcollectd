@@ -254,8 +254,16 @@ void SubmitMwservModule::handleEvent(Event * ev)
 		PendingInstanceInfo * info = new PendingInstanceInfo;
 		StreamRecorder * recorder = (StreamRecorder *) (* ev)["recorder"].getPointerValue();
 
-		info->name = * (* ev)["name"];
-		info->data = recorder->getProperty(("file:" + info->name).c_str());
+		if(ev->hasAttribute("data"))
+		{
+			info->name = "unkown";
+			info->data = * (* ev)["data"];
+		}
+		else
+		{
+			info->name = * (* ev)["name"];
+			info->data = recorder->getProperty(("file:" + info->name).c_str());
+		}
 		info->url = * (* ev)["url"];
 
 		info->recorder = recorder;
