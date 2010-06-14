@@ -7,9 +7,14 @@
 
 import time
 import itertools
+from dionaea_compat import *
+
 
 from .fieldtypes import StrField,ConditionalField,Emph,PacketListField
 from .helpers import VolatileValue, Gen, SetGen, BasePacket
+
+global logger
+logger = Logger('SCAPY')
 
 
 ######################################
@@ -107,16 +112,16 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
     @classmethod
     def upper_bonds(self):
         for fval,upper in self.payload_guess:
-            # print("%-20s  %s" % (upper.__name__, ", ".join("%-12s" % ("%s=%r"%i) for i in fval.items())))
-            pass
+            print("%-20s  %s" % (upper.__name__, ", ".join("%-12s" % ("%s=%r"%i) for i in fval.items())))
 
     @classmethod
     def lower_bonds(self):
         for lower,fval in self.overload_fields.items():
-            # print("%-20s  %s" % (lower.__name__, ", ".join("%-12s" % ("%s=%r"%i) for i in fval.items())))
-            pass
+            print("%-20s  %s" % (lower.__name__, ", ".join("%-12s" % ("%s=%r"%i) for i in fval.items())))
 
-    def __init__(self, _pkt="", post_transform=None, _internal=0, _underlayer=None, **fields):
+    def __init__(self, _pkt="", _ctx=None, post_transform=None, _internal=0, _underlayer=None, **fields):
+        if _ctx:
+            self.ctx = _ctx
         self.time  = time.time()
         self.sent_time = 0
         if self.name is None:
@@ -144,6 +149,7 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
         else:
             self.post_transforms = [post_transform]
 
+
     def init_fields(self):
         self.do_init_fields(self.fields_desc)
 
@@ -162,6 +168,7 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
     def post_dissection(self, pkt):
         """DEV: is called after the dissection of the whole packet"""
         pass
+        
 
     def get_field(self, fld):
         """DEV: returns the field instance from the name of the field"""
@@ -393,12 +400,9 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
                 raise
             except:
                 if isinstance(cls,type) and issubclass(cls,Packet):
-                    # print("%s dissector failed" % cls.name)
-                    pass
+                    print("%s dissector failed" % cls.name)
                 else:
-                    # print("%s.guess_payload_class() returned [%s]" % (self.__class__.__name__,repr(cls))
-                    pass
-
+                    print("%s.guess_payload_class() returned [%s]" % (self.__class__.__name__,repr(cls)))
                 if cls is not None:
                     raise
                 p = Raw(s, _internal=1, _underlayer=self)
@@ -617,31 +621,45 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
     def fragment(self, *args, **kargs):
         return self.payload.fragment(*args, **kargs)
     
+    def size(self):
+        x = 0
+        for f in self.fields_desc:
+            x += f.size(self, self.getfieldval(f.name))
+        return x
+
 
     def display(self,*args,**kargs):  # Deprecated. Use show()
         """Deprecated. Use show() method."""
         self.show(*args,**kargs)
-    def show(self, indent=3, lvl="", label_lvl=""):
+    def show(self, indent=3, lvl="", label_lvl="", goff=0):
         """Prints a hierarchical view of the packet. "indent" gives the size of indentation for each layer."""
-        print("%s%s %s %s" % (label_lvl,
+#        return
+        logger.debug("%s%s %s sizeof(%i) %s " % (label_lvl,
                               "###[",
-                              self.name,
+                              self.name, self.size(),
                               "]###"))
+        off=0
         for f in self.fields_desc:
             if isinstance(f, ConditionalField) and not f._evalcond(self):
                 continue
             fvalue = self.getfieldval(f.name)
             if isinstance(fvalue, Packet) or (f.islist and f.holds_packets and type(fvalue) is list):
-                print("%s  \\%-10s\\" % (label_lvl+lvl, f.name))
+                logger.debug("%s  \\%-10s\\" % (label_lvl+lvl, f.name))
                 fvalue_gen = SetGen(fvalue,_iterpacket=0)
                 for fvalue in fvalue_gen:
-                    fvalue.show(indent=indent, label_lvl=label_lvl+lvl+"   |")
+                    fvalue.show(indent=indent, label_lvl=label_lvl+lvl+"   |", goff=goff)
             else:
-                print("%s  %-10s%s %s" % (label_lvl+lvl,
+                size = f.size(self,fvalue)
+                logger.debug("%s  %-20s%s %-15s sizeof(%3i) off=%3i goff=%3i" % (label_lvl+lvl,
                                           f.name,
                                           "=",
-                                          f.i2repr(self,fvalue)))
-        self.payload.show(indent=indent, lvl=lvl+(" "*indent*self.show_indent), label_lvl=label_lvl)
+                                          f.i2repr(self,fvalue),
+                                          size,
+                                          off,
+                                          goff))
+                off += size
+                goff +=size
+        self.payload.show(indent=indent, lvl=lvl+(" "*indent*self.show_indent), label_lvl=label_lvl, goff=goff)
     def show2(self):
         """Prints a hierarchical view of an assembled version of the packet, so that automatic fields are calculated (checksums, etc.)"""
         self.__class__(self.build()).show()
@@ -872,7 +890,7 @@ class NoPayload(Packet):
         return None
     def fragment(self, *args, **kargs):
         raise Exception("cannot fragment this packet")        
-    def show(self, indent=3, lvl="", label_lvl=""):
+    def show(self, indent=3, lvl="", label_lvl="", goff=0):
         pass
     def sprintf(self, fmt, relax):
         if relax:
