@@ -348,11 +348,11 @@ class smbd(connection):
 						smblog.warn("Attempt to register %s failed, UUID does not exist or is not implemented" % service_uuid)
 				else:
 					smblog.warn("Attempt to register %s failed, TransferSyntax %s is unknown" % (service_uuid, transfersyntax_uuid) )
-				i = incident("dionaea.modules.python.smb.dcerpc.bind")
-				i.con = self
-				i.uuid = str(service_uuid)
-				i.transfersyntax = str(transfersyntax_uuid)
-				i.report()
+#				i = incident("dionaea.modules.python.smb.dcerpc.bind")
+#				i.con = self
+#				i.uuid = str(service_uuid)
+#				i.transfersyntax = str(transfersyntax_uuid)
+#				i.report()
 				c += 1
 			outbuf.NumCtxItems = c
 			outbuf.FragLen = len(outbuf.build())
@@ -363,11 +363,11 @@ class smbd(connection):
 			if 'uuid' in self.state:
 				service = registered_services[self.state['uuid']]
 				resp = service.processrequest(service, self, dcep.OpNum, dcep)
-				i = incident("dionaea.modules.python.smb.dcerpc.request")
-				i.con = self
-				i.uuid = str(UUID(bytes=bytes.fromhex(self.state['uuid'])))
-				i.opnum = dcep.OpNum
-				i.report()
+#				i = incident("dionaea.modules.python.smb.dcerpc.request")
+#				i.con = self
+#				i.uuid = str(UUID(bytes=bytes.fromhex(self.state['uuid'])))
+#				i.opnum = dcep.OpNum
+#				i.report()
 			else:
 				smblog.info("DCERPC Request without pending action")
 			if not resp:
