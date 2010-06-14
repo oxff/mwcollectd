@@ -8,9 +8,12 @@
 
 
 mwcollectd is a versatile malware collection daemon for POSIX environments
-licensed under the LGPL v3 (see LICENSE file). The reason for choosing the
-LGPL instead of the GPL is to allow for proprietary modules to be linked into
-the daemon.
+licensed under the LGPL v3 (see LICENSE.LESSER file). The reason for choosing
+the LGPL instead of the GPL is to allow for proprietary modules to be linked
+into the daemon.
+
+The SMB implementation found under src/embed-python/modules/smb/ is taken
+from dionaea and licensed under the GPL License (see LICENSE file).
 
 This program implements ideas by Markus Koetter (esp. from Nepenthes and
 evtest) and Tillmann Werner (honeytrap). The main maintainer is Georg Wicherski
