@@ -320,7 +320,7 @@ class smbd(connection):
 		smblog.debug("data")
 		dcep.show()
 		if dcep.AuthLen > 0:
-			print(dcep.getlayer(Raw).underlayer.load)
+#			print(dcep.getlayer(Raw).underlayer.load)
 			dcep.getlayer(Raw).underlayer.decode_payload_as(DCERPC_Auth_Verfier) 
 			dcep.show()
 
