@@ -61,7 +61,7 @@ class RPCService:
 				r.StubData = data
 				r.CallID = p.CallID
 				r.FragLen = 24 + len(data)
-				print(data)
+#				print(data)
 #				print(r.show())
 				return r
 		else:
@@ -244,7 +244,7 @@ class IOXIDResolver(RPCService):
 		p.pack_pointer(0)
 		p.pack_long(0)
 		
-		print(p.get_buffer())
+#		print(p.get_buffer())
 		return p.get_buffer()
 
 
@@ -492,11 +492,11 @@ class samr(RPCService):
 		x = ndrlib.Unpacker(p.StubData)
 		PServerName = x.unpack_pointer()
 		ServerName = x.unpack_string()
-		print("ServerName %s" % ServerName)
+#		print("ServerName %s" % ServerName)
 		DesiredAccess = x.unpack_long()
-		print("DesiredAccess %i" % DesiredAccess)
+#		print("DesiredAccess %i" % DesiredAccess)
 		ClientRevision = x.unpack_long()
-		print("InVersion %i" % ClientRevision)
+#		print("InVersion %i" % ClientRevision)
 
 		r = ndrlib.Packer()
 
@@ -530,12 +530,12 @@ class samr(RPCService):
 		PServerName = x.unpack_pointer()
 		ServerName = x.unpack_string()
 
-		print("ServerName %s" % ServerName)
+#		print("ServerName %s" % ServerName)
 		DesiredAccess = x.unpack_long()
 
-		print("DesiredAccess %i" % DesiredAccess)
+#		print("DesiredAccess %i" % DesiredAccess)		
 		InVersion = x.unpack_long()
-		print("InVersion %i" % InVersion)
+#		print("InVersion %i" % InVersion)
 
 		PInRevisionInfo = x.unpack_pointer()
 
@@ -544,8 +544,7 @@ class samr(RPCService):
 		Revision = x.unpack_long()
 		SupportedFeatures = x.unpack_long()
 
-		print("Revision %i SupportedFeatures %i" % (Revision, SupportedFeatures))
-
+#		print("Revision %i SupportedFeatures %i" % (Revision, SupportedFeatures))
 		r = ndrlib.Packer()
 
 		r.pack_pointer(0x1)
@@ -577,13 +576,13 @@ class samr(RPCService):
 		#);
 		x = ndrlib.Unpacker(p.StubData)
 		ServerHandle = x.unpack_raw(20)
-		print("ServerHandle %s" % ServerHandle)
+#		print("ServerHandle %s" % ServerHandle)
 
 		EnumerationContext = x.unpack_long()
-		print("EnumerationContext %i" % EnumerationContext)
+#		print("EnumerationContext %i" % EnumerationContext)
 		
 		PreferedMaximumLength = x.unpack_long()
-		print("PreferedMaximumLength %i" % PreferedMaximumLength)
+#		print("PreferedMaximumLength %i" % PreferedMaximumLength)
 		
 		r = ndrlib.Packer()
 		r.pack_pointer(EnumerationContext)
@@ -657,17 +656,17 @@ class samr(RPCService):
 		#);
 		x = ndrlib.Unpacker(p.StubData)
 		ServerHandle = x.unpack_raw(20)
-		print("ServerHandle %s" % ServerHandle)
+#		print("ServerHandle %s" % ServerHandle)
 
 		Length = x.unpack_short()
 		MaxLength = x.unpack_short()
-		print("Length %i MaxLength %i" % (Length, MaxLength))
+#		print("Length %i MaxLength %i" % (Length, MaxLength))
 
 		Reference = x.unpack_long()
-		print("Reference %i" % (Reference))
+#		print("Reference %i" % (Reference))
 
 		DomainName = x.unpack_string()
-		print("Domain Name %s" % (DomainName))
+#		print("Domain Name %s" % (DomainName))
 
 		r = ndrlib.Packer()
 		r.pack_pointer(0x0da260)   #same as EnumDomain
@@ -720,10 +719,10 @@ class samr(RPCService):
 		# );
 		x = ndrlib.Unpacker(p.StubData)
 		ServerHandle = x.unpack_raw(20)
-		print("ServerHandle %s" % ServerHandle)
+#		print("ServerHandle %s" % ServerHandle)
 
 		DesiredAccess = x.unpack_long()
-		print("DesiredAccess %i" % DesiredAccess)
+#		print("DesiredAccess %i" % DesiredAccess)
 
 		#RPC_SID
 		Count = x.unpack_long()
@@ -731,11 +730,11 @@ class samr(RPCService):
 		Revision = x.unpack_small()
 		SubAuthorityCount = x.unpack_small()
 		IdentifierAuthority = x.unpack_raw(6)
-		print("Revision %i SubAuthorityCount %i IdentifierAuthority %s" % (Revision, SubAuthorityCount, IdentifierAuthority))
+#		print("Revision %i SubAuthorityCount %i IdentifierAuthority %s" % (Revision, SubAuthorityCount, IdentifierAuthority))
 		
 		for i in range(Count):
 			SubAuthority = x.unpack_long()
-			print("%i" % (SubAuthority))
+#			print("%i" % (SubAuthority))
 		
 		r = ndrlib.Packer()
 		r.pack_raw(b'11223344556677889900')
@@ -759,16 +758,16 @@ class samr(RPCService):
 		#)
 		x = ndrlib.Unpacker(p.StubData)
 		DomainHandle = x.unpack_raw(20)
-		print("DomainHandle %s" % DomainHandle)
+#		print("DomainHandle %s" % DomainHandle)
 	
 		EnumerationContext = x.unpack_long()
-		print("EnumerationContext %i" % EnumerationContext)
+#		print("EnumerationContext %i" % EnumerationContext)
 		
 		UserAccountControl = x.unpack_long()
-		print("UserAccountControl %i" % UserAccountControl)
+#		print("UserAccountControl %i" % UserAccountControl)
 
 		PreferedMaximumLength = x.unpack_long()
-		print("PreferedMaximumLength %i" % PreferedMaximumLength)
+#		print("PreferedMaximumLength %i" % PreferedMaximumLength)
 
 		r = ndrlib.Packer()
 		r.pack_pointer(EnumerationContext)
@@ -844,7 +843,7 @@ class samr(RPCService):
 		#);
 		x = ndrlib.Unpacker(p.StubData)
 		SamHandle = x.unpack_raw(20)
-		print("SamHandle %s" % SamHandle)
+#		print("SamHandle %s" % SamHandle)
 		
 		r = ndrlib.Packer()
 		r.pack_raw(b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0')
@@ -981,6 +980,7 @@ class SRVSVC(RPCService):
 		if resumehandleptr != 0:
 			resumehandle = x.unpack_long()
 		
+		"""		
 		print("srvsvc_handle_ref %x srvsvc_handle %s infostruct_level %i count %i buffer %x preferdmaxlen %i  resumehandleptr %x resumehandle %i" % (
 			srvsvc_handle_ref,
 			srvsvc_handle,
@@ -990,6 +990,7 @@ class SRVSVC(RPCService):
 			preferdmaxlen,
 			resumehandleptr,
 			resumehandle) )
+		"""
 
 
 		# compile reply
@@ -1142,7 +1143,7 @@ class SRVSVC(RPCService):
 		prefix     = x.unpack_string()
 		pathtype   = x.unpack_long()
 		pathflags  = x.unpack_long()
-		print("ref 0x%x server_unc %s path %s maxbuf %s prefix %s pathtype %i pathflags %i" % (ref, server_unc, path, maxbuf, prefix, pathtype, pathflags))
+#		print("ref 0x%x server_unc %s path %s maxbuf %s prefix %s pathtype %i pathflags %i" % (ref, server_unc, path, maxbuf, prefix, pathtype, pathflags))
 
 		r = ndrlib.Packer()
 #		r.pack_long(pathflags)
@@ -1172,7 +1173,7 @@ class SRVSVC(RPCService):
 		path2     = p.unpack_string()
 		pathtype   = p.unpack_long()
 		pathflags  = p.unpack_long()
-		print("ref 0x%x server_unc %s path1 %s path2 %s pathtype %i pathflags %i" % (ref, server_unc, path1.decode('utf-16'), path2.decode('utf-16'), pathtype, pathflags))
+#		print("ref 0x%x server_unc %s path1 %s path2 %s pathtype %i pathflags %i" % (ref, server_unc, path1.decode('utf-16'), path2.decode('utf-16'), pathtype, pathflags))
 		r = ndrlib.Packer()
 		x = (path1 > path2) - (path1 < path2) 
 		if x < 0:

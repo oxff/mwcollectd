@@ -1096,7 +1096,7 @@ class SMB_Trans_Request(Packet):
 		if hasattr(self, 'Padding') and self.Padding != None:
 			r += len(self.Padding)		# optional Padding 
 		r += len(self.TransactionName)	# TransactionName
-		print("r %i usize %i txn %i" % ( r, self.underlayer.size(), len(self.TransactionName)))
+#		print("r %i usize %i txn %i" % ( r, self.underlayer.size(), len(self.TransactionName)))
 		r = self.ParamOffset - r
 		return r
 
