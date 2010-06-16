@@ -148,6 +148,7 @@ typedef struct {
 	PyObject_HEAD
 	PythonEndpoint * endpoint;
 	mwcollectd_NetworkEndpointTimeouts * timeouts;
+	char * remote;
 } mwcollectd_NetworkEndpoint;
 
 

@@ -85,6 +85,12 @@ void PythonEndpoint::connectionEstablished(NetworkNode * remote, NetworkNode * l
 
 	m_recorder = new StreamRecorder(remote, local);
 
+	if(m_pyEndpoint->remote)
+		free(m_pyEndpoint->remote);
+
+	if(asprintf(&m_pyEndpoint->remote, "%s:%hu", remote->name.c_str(), remote->port) == -1)
+		m_pyEndpoint->remote = 0;
+
 	if(!fn || !PyCallable_Check(fn))
 	{
 		GLOG(L_CRIT, "%s has no callable attribute 'connectionEstablished'!",
