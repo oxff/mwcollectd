@@ -567,6 +567,54 @@ static PyTypeObject mwcollectd_EventSubscriptionType = {
 
 
 
+static PyObject * mwcollectd_Timeout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	mwcollectd_Timeout * self;
+	self = (mwcollectd_Timeout *) type->tp_alloc(type, 0);
+
+	size_t seconds;
+	PyObject * receiver;
+
+	if(!PyArg_ParseTuple(args, "iO:Timeout", &seconds, &receiver))
+		return 0;
+
+	if(!PyCallable_Check(receiver))
+	{
+		PyErr_Format(PyExc_TypeError, "Timeout receiver '%s' is not callable!",
+			EmbedPythonModule::toString(receiver).c_str());
+		return 0;
+	}
+
+	self->timeout = new PythonTimeout((PyObject *) self);
+	self->timeout->schedule(receiver, seconds);
+
+	return (PyObject *) self;
+}
+
+static void mwcollectd_Timeout_dealloc(mwcollectd_Timeout * self)
+{
+	delete self->timeout;
+	Py_TYPE((PyObject *) self)->tp_free(self);
+}
+
+	
+static PyTypeObject mwcollectd_TimeoutType = {
+	PyObject_HEAD_INIT(NULL)
+	"mwcollectd.Timeout",
+	sizeof(mwcollectd_Timeout),
+	0, 
+	(void (*)(PyObject *)) mwcollectd_Timeout_dealloc,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	Py_TPFLAGS_DEFAULT,
+	"Timeout that is fired exactly once unless deleted prematurely.",
+	0, 0, 0, 0, 0, 0,
+	0, // mwcollectd_Timeout_methods,
+	0, 0, 0, 0, 0, 0, 0, 0, 0,
+	mwcollectd_Timeout_new
+};
+
+
+
 static PyObject * mwcollectd_log(PyObject *self, PyObject *args)
 {
 	LogManager::LogLevel level;
@@ -711,7 +759,8 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 	PyObject * module;
 
 	if(PyType_Ready(&mwcollectd_NetworkEndpointTimeoutsType) < 0 || PyType_Ready(&mwcollectd_EventSubscriptionType) < 0
-		|| PyType_Ready(&mwcollectd_NetworkEndpointType) < 0 || PyType_Ready(&mwcollectd_NetworkServerType) < 0)
+		|| PyType_Ready(&mwcollectd_NetworkEndpointType) < 0 || PyType_Ready(&mwcollectd_NetworkServerType) < 0
+		|| PyType_Ready(&mwcollectd_TimeoutType) < 0)
 	{
 		return 0;
 	}
@@ -737,6 +786,9 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 	
 	Py_INCREF(&mwcollectd_EventSubscriptionType);
 	PyModule_AddObject(module, "EventSubscription", (PyObject *) &mwcollectd_EventSubscriptionType);
+	
+	Py_INCREF(&mwcollectd_TimeoutType);
+	PyModule_AddObject(module, "Timeout", (PyObject *) &mwcollectd_TimeoutType);
 
 	return module;
 }

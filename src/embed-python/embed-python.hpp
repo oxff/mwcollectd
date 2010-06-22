@@ -254,6 +254,31 @@ protected:
 	Timeout m_timeout;
 };
 
+
+class PythonTimeout : public TimeoutReceiver
+{
+public:
+	PythonTimeout(PyObject * pyTimeout)
+		: m_receiver(0), m_timeout(TIMEOUT_EMPTY), m_pyTimeout(pyTimeout)
+	{ }
+
+	void schedule(PyObject * receiver, size_t seconds);
+	~PythonTimeout();
+
+	virtual void timeoutFired(Timeout t);
+
+private:
+	PyObject * m_receiver;
+	Timeout m_timeout;
+	PyObject * m_pyTimeout;
+};
+
+typedef struct {
+	PyObject_HEAD
+	PythonTimeout * timeout;
+} mwcollectd_Timeout;
+
+
 PyMODINIT_FUNC PyInit_mwcollectd();
 
 
