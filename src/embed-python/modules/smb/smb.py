@@ -70,6 +70,7 @@ class smbd(connection):
 
 	def connectionEstablished(self):
 		self.timeouts.sustain = 120
+		self.timeouts.kill = 600
 #		self._in.accounting.limit  = 2000*1024
 #		self._out.accounting.limit = 2000*1024
 		self.processors()

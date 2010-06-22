@@ -13,9 +13,6 @@ from dionaea_compat import *
 from .fieldtypes import StrField,ConditionalField,Emph,PacketListField
 from .helpers import VolatileValue, Gen, SetGen, BasePacket
 
-global logger
-logger = Logger('SCAPY')
-
 
 ######################################
 ## Packet abstract and base classes ##
@@ -633,7 +630,7 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
         self.show(*args,**kargs)
     def show(self, indent=3, lvl="", label_lvl="", goff=0):
         """Prints a hierarchical view of the packet. "indent" gives the size of indentation for each layer."""
-#        return
+        return
         logger.debug("%s%s %s sizeof(%i) %s " % (label_lvl,
                               "###[",
                               self.name, self.size(),
