@@ -46,6 +46,8 @@ PythonTimeout::~PythonTimeout()
 		g_daemon->getTimeoutManager()->dropTimeout(m_timeout);
 		Py_DECREF(m_receiver);
 	}
+
+	Py_XDECREF(m_pyTimeout);
 }
 
 void PythonTimeout::timeoutFired(Timeout t)
@@ -56,21 +58,27 @@ void PythonTimeout::timeoutFired(Timeout t)
 	PyObject * args = Py_BuildValue("(O)", m_pyTimeout);
 	PyObject * res = PyObject_CallObject(m_receiver, args);
 
-	Py_DECREF(m_receiver);
-	
 	if(!res)
 	{
-		GLOG(L_CRIT, "Calling attribute timeout receiver %s failed:", 
+		GLOG(L_CRIT, "Invoking timeout receiver %s failed:", 
 			EmbedPythonModule::toString((PyObject *) m_receiver).c_str());
+
+		Py_DECREF(m_receiver);	
 
 		g_module->logError();
 		PyErr_Clear();
 	
 		Py_XDECREF(args);
+		Py_DECREF(m_pyTimeout);
+		m_pyTimeout = 0;
 		return;
 	}
+	
 
+	Py_DECREF(m_receiver);	
 	Py_XDECREF(args);
 	Py_DECREF(res);
+	Py_DECREF(m_pyTimeout);
+	m_pyTimeout = 0;
 }
 

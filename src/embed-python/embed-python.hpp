@@ -259,14 +259,17 @@ protected:
 class PythonTimeout : public TimeoutReceiver
 {
 public:
-	PythonTimeout(PyObject * pyTimeout)
+	inline PythonTimeout(PyObject * pyTimeout)
 		: m_receiver(0), m_timeout(TIMEOUT_EMPTY), m_pyTimeout(pyTimeout)
-	{ }
+	{ Py_INCREF(m_pyTimeout); }
 
 	void schedule(PyObject * receiver, size_t seconds);
 	~PythonTimeout();
 
 	virtual void timeoutFired(Timeout t);
+
+	inline PyObject * getReceiver() const
+	{ return m_receiver; }
 
 private:
 	PyObject * m_receiver;

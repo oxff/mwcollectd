@@ -601,9 +601,35 @@ static PyObject * mwcollectd_Timeout_new(PyTypeObject *type, PyObject *args, PyO
 
 static void mwcollectd_Timeout_dealloc(mwcollectd_Timeout * self)
 {
-	delete self->timeout;
+//	GLOG(L_SPAM, "%s: %s", __PRETTY_FUNCTION__, EmbedPythonModule::toString((PyObject *) self).c_str());
+
+	if(self->timeout)
+		delete self->timeout;
+
 	Py_TYPE((PyObject *) self)->tp_free(self);
 }
+
+static PyObject * mwcollectd_Timeout_cancel(mwcollectd_Timeout * self, PyObject * args)
+{
+	if(self->timeout)
+	{
+		delete self->timeout;
+		self->timeout = 0;
+	}
+	else
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Timeout.cancel() can only be called once!");
+		return 0;
+	}
+
+	Py_RETURN_NONE;
+}
+
+static PyMethodDef mwcollectd_Timeout_methods[] = {
+	{ "cancel", (PyObject * (*)(PyObject *, PyObject *)) mwcollectd_Timeout_cancel, METH_NOARGS,
+		"Cancel the live timeout, such that it will be never fired (and free'd)." },
+	{ 0, 0, 0, 0 }
+};
 
 	
 static PyTypeObject mwcollectd_TimeoutType = {
@@ -616,7 +642,7 @@ static PyTypeObject mwcollectd_TimeoutType = {
 	Py_TPFLAGS_DEFAULT,
 	"Timeout that is fired exactly once unless deleted prematurely.",
 	0, 0, 0, 0, 0, 0,
-	0, // mwcollectd_Timeout_methods,
+	mwcollectd_Timeout_methods,
 	0, 0, 0, 0, 0, 0, 0, 0, 0,
 	mwcollectd_Timeout_new
 };
