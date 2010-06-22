@@ -29,6 +29,8 @@
 #include "embed-python.hpp"
 #include <structmember.h>
 
+#include <frameobject.h>
+
 
 
 
@@ -133,6 +135,8 @@ static PyObject * mwcollectd_NetworkEndpoint_new(PyTypeObject *type, PyObject *a
 	self->timeouts->kill = 0;
 	self->timeouts->tKill = TIMEOUT_EMPTY;
 
+	self->remote = 0;
+
 	return (PyObject *) self;
 }
 
@@ -140,6 +144,9 @@ static void mwcollectd_NetworkEndpoint_dealloc(mwcollectd_NetworkEndpoint * self
 {
 	if(self->endpoint)
 		delete self->endpoint;
+
+	if(self->remote);
+		free(self->remote);
 
 	Py_TYPE((PyObject *) self->timeouts)->tp_free(self->timeouts);
 
@@ -197,6 +204,7 @@ static PyMethodDef mwcollectd_NetworkEndpoint_methods[] = {
 
 static PyMemberDef mwcollectd_NetworkEndpoint_members[] = {
 	{ (char *) "timeouts", T_OBJECT_EX, offsetof(mwcollectd_NetworkEndpoint, timeouts), READONLY, (char *) "Network timeouts." },
+	{ (char *) "remote", T_STRING, offsetof(mwcollectd_NetworkEndpoint, remote), READONLY, (char *) "Remote network address." },
 	{ 0, 0, 0, 0, 0 }
 };
 
@@ -619,9 +627,42 @@ static PyObject * mwcollectd_log(PyObject *self, PyObject *args)
 {
 	LogManager::LogLevel level;
 	const char * msg;
+	bool noprefix = false;
 
-	if(!PyArg_ParseTuple(args, "is:log", &level, &msg))
+	if(!PyArg_ParseTuple(args, "is|b:log", &level, &msg, &noprefix))
 		return 0;
+
+	PyFrameObject * frame = PyEval_GetFrame();
+
+	if(!noprefix)
+	{
+		do
+		{
+			PyFrame_FastToLocals(frame);
+			PyObject * callerself;
+
+			if(PyDict_Check(frame->f_locals) && (callerself = PyDict_GetItemString(frame->f_locals, "self"))
+				&& PyObject_IsInstance(callerself, (PyObject *) &mwcollectd_NetworkEndpointType))
+			{
+				PyObject * remote = PyObject_GetAttrString(callerself, "remote");
+
+				if(!remote || !PyUnicode_Check(remote))
+				{
+					Py_XDECREF(remote);
+					
+					frame = frame->f_back;
+					continue;
+				}
+
+				GLOG(level, "<%s> %s", EmbedPythonModule::toString(remote).c_str(), msg);
+
+				Py_DECREF(remote);
+				Py_RETURN_NONE;
+			}
+
+			frame = frame->f_back;
+		} while(frame);
+	}
 
 	GLOG(level, "%s", msg);
 
