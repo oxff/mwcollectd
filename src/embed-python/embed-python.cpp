@@ -229,7 +229,7 @@ PyObject * EmbedPythonModule::buildConfiguration(const string& fname)
 	}
 	catch(const char * error)
 	{
-		GLOG(L_CRIT, "Parsing configuration file '%s' failed: %s\n", filename.c_str(), error);
+		GLOG(L_CRIT, "Parsing configuration file '%s' failed: %s", filename.c_str(), error);
 		Py_RETURN_NONE;
 	}
 
@@ -246,11 +246,14 @@ PyObject * EmbedPythonModule::buildConfiguration(const string& fname)
 		Py_DECREF(pyConfig);
 		delete config;
 
+		GLOG(L_CRIT, "Could not pythonify configuration file '%s':", filename.c_str());
+		logError();
+
 		Py_RETURN_NONE;
 	}
 
 	delete config;
-	Py_RETURN_NONE;
+	return pyConfig;
 }
 
 bool EmbedPythonModule::addSubconf(PyObject * parent, const string& path, Configuration * config)
@@ -259,18 +262,58 @@ bool EmbedPythonModule::addSubconf(PyObject * parent, const string& path, Config
 
 	for(vector<string>::iterator it = subkeys.begin(); it != subkeys.end(); ++it)
 	{
-		LOG(L_SPAM, "Add subkey %s to configuration", (path + * it).c_str());
+		PyObject * child;
 
 		switch(config->nodeType((path + * it).c_str()))
 		{
 			case CFGNT_SECTION:
-				addSubconf(parent, (path + * it + ":").c_str(), config);
+				if(!(child = PyDict_New()))
+					return false;
+
+				if(!addSubconf(child, (path + * it + ":").c_str(), config))
+				{
+					Py_DECREF(child);
+					return false;
+				}
+
 				break;
 
 			case CFGNT_NONE:
+				return false;
+
 			case CFGNT_VALUE:
-			case CFGNT_LIST:
+				if(!(child = PyUnicode_FromString(config->getString((path + * it).c_str(), ""))))
+					return false;
+
 				break;
+
+			case CFGNT_LIST:
+				{
+					size_t k = 0;
+					vector<string> stringlist = config->getStringList((path + * it).c_str());	
+					child = PyList_New(stringlist.size());
+
+					for(vector<string>::iterator it = stringlist.begin(); it != stringlist.end(); ++it, ++k)
+					{
+						PyObject * stringobj = PyUnicode_FromString(it->c_str());
+
+						if(!stringobj)
+						{
+							Py_DECREF(child);
+							return false;
+						}
+
+						PyList_SetItem(child, k, stringobj);
+					}
+
+					break;
+				}
+		}
+
+		if(child)
+		{
+			PyDict_SetItemString(parent, it->c_str(), child);
+			Py_DECREF(child);
 		}
 	}
 

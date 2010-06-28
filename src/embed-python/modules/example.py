@@ -24,7 +24,7 @@ class DebugEventHandler:
 
 def start(config):
 	if config:
-		pass
+		log(L_INFO, 'Example configuration: ' + repr(config))
 	else:
 		log(L_INFO, 'Example Python module loaded with no configuration!')
 
