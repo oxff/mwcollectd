@@ -22,7 +22,12 @@ class DebugEventHandler:
 		log(L_SPAM, '%s: %s' % (name, repr(event)))
 
 
-def start():
+def start(config):
+	if config:
+		pass
+	else:
+		log(L_INFO, 'Example Python module loaded with no configuration!')
+
 	log(L_INFO, mwcollectd.version)
 
 	global smb_server

@@ -121,7 +121,15 @@ bool EmbedPythonModule::start(Configuration * config)
 
 	for(vector<string>::iterator it = submodules.begin(); it != submodules.end(); ++it)
 	{
-		PyObject * module = PyImport_ImportModule(it->c_str());
+		PyObject * configuration = Py_None;
+		string::size_type nameEnd = it->find(":");
+
+		PyObject * module = PyImport_ImportModule(it->substr(0, nameEnd).c_str());
+
+		if(nameEnd != string::npos)
+			configuration = buildConfiguration(it->substr(nameEnd + 1));
+		else
+			Py_INCREF(Py_None);
 
 		if(module && !PyErr_Occurred())
 		{
@@ -129,7 +137,8 @@ bool EmbedPythonModule::start(Configuration * config)
 
 			if(fnStart && PyCallable_Check(fnStart))
 			{
-				PyObject * res = PyObject_CallObject(fnStart, 0);
+				PyObject * args = Py_BuildValue("(O)", configuration);
+				PyObject * res = PyObject_CallObject(fnStart, args);
 
 				if(!res)
 				{
@@ -137,6 +146,8 @@ bool EmbedPythonModule::start(Configuration * config)
 	
 					logError();
 
+					Py_XDECREF(args);
+					Py_DECREF(configuration);
 					Py_Finalize();
 					return false;
 				}
@@ -147,11 +158,15 @@ bool EmbedPythonModule::start(Configuration * config)
 						LOG(L_CRIT, "Module '%s' failed to initialize!", it->c_str());
 						LOG(L_SPAM, "%s.start() returned %s", it->c_str(), toString(res).c_str());
 						
+						Py_XDECREF(args);
+						Py_DECREF(configuration);
 						Py_Finalize();
 						return false;
 					}
 
 					Py_DECREF(res);
+					Py_XDECREF(args);
+					Py_DECREF(configuration);
 
 					m_modules.push_back(module);
 				}
@@ -163,6 +178,7 @@ bool EmbedPythonModule::start(Configuration * config)
 				LOG(L_CRIT, "No start() in '%s':", it->c_str());
 				logError();
 
+				Py_DECREF(configuration);
 				Py_Finalize();
 				return false;
 			}
@@ -172,6 +188,7 @@ bool EmbedPythonModule::start(Configuration * config)
 			LOG(L_CRIT, "Could not load submodule '%s':", it->c_str());
 			logError();
 
+			Py_DECREF(configuration);
 			Py_Finalize();
 			return false;
 		}
@@ -190,6 +207,71 @@ bool EmbedPythonModule::start(Configuration * config)
 		}
 
 		LOG(L_INFO, "Python %s with %u extension module(s) ready.", version.c_str(), submodules.size());
+	}
+
+	return true;
+}
+
+PyObject * EmbedPythonModule::buildConfiguration(const string& fname)
+{
+	string filename;
+
+	if(fname[0] != '/')
+		filename = g_daemon->getConfigBasepath();
+
+	filename += fname;
+
+	Configuration * config = new Configuration();
+
+	try
+	{
+		config->parseFile(filename.c_str());
+	}
+	catch(const char * error)
+	{
+		GLOG(L_CRIT, "Parsing configuration file '%s' failed: %s\n", filename.c_str(), error);
+		Py_RETURN_NONE;
+	}
+
+	PyObject * pyConfig = PyDict_New();
+
+	if(!pyConfig)
+	{
+		delete config;
+		Py_RETURN_NONE;
+	}
+
+	if(!addSubconf(pyConfig, ":", config))
+	{
+		Py_DECREF(pyConfig);
+		delete config;
+
+		Py_RETURN_NONE;
+	}
+
+	delete config;
+	Py_RETURN_NONE;
+}
+
+bool EmbedPythonModule::addSubconf(PyObject * parent, const string& path, Configuration * config)
+{
+	vector<string> subkeys = config->enumerateSubkeys(path.c_str());
+
+	for(vector<string>::iterator it = subkeys.begin(); it != subkeys.end(); ++it)
+	{
+		LOG(L_SPAM, "Add subkey %s to configuration", (path + * it).c_str());
+
+		switch(config->nodeType((path + * it).c_str()))
+		{
+			case CFGNT_SECTION:
+				addSubconf(parent, (path + * it + ":").c_str(), config);
+				break;
+
+			case CFGNT_NONE:
+			case CFGNT_VALUE:
+			case CFGNT_LIST:
+				break;
+		}
 	}
 
 	return true;

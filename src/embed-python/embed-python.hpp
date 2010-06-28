@@ -104,7 +104,12 @@ protected:
 		it->second.servers.erase(jt);
 	}
 
+	PyObject * buildConfiguration(const string& filename);
+
 	friend class DynamicPythonEndpointFactory;
+
+private:
+	bool addSubconf(PyObject * parent, const string& path, Configuration * config);
 
 private:
 	Daemon * m_daemon;
