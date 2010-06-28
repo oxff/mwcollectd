@@ -20,7 +20,7 @@ class Connection(NetworkEndpoint):
 			self.buffer = self.buffer[pos+1:]
 
 
-def start():
+def start(config):
 	global server
 	server = NetworkServer(('any', 8080), Connection)
 

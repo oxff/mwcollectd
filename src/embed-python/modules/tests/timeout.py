@@ -13,7 +13,7 @@ class TimeoutUser:
 			self.timeout.cancel()
 			del self.timeout
 
-def start():
+def start(config):
 	global tu
 	tu = TimeoutUser()
 

@@ -27,7 +27,7 @@
 from http.HttpConnection import HttpConnection
 from mwcollectd import *
 
-def start():
+def start(config):
 	global http_server
 	http_server = NetworkServer(('any', 80), HttpConnection)
 

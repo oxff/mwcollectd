@@ -34,7 +34,7 @@ from mwcollectd import *
 
 import traceback
 
-def start():
+def start(config):
 	from .smb import smbd, epmapper
 	
 	global smb_server, epm_server

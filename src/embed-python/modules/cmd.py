@@ -133,7 +133,7 @@ class ShellcodeProcessHandler:
 		return ('tftp://' + command[0] + '/' + command[2], command[2])
 
 
-def start():
+def start(config):
 	global process_handler
 	process_handler = EventSubscription('shellcode.process', ShellcodeProcessHandler)
 	return process_handler.register()

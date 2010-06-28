@@ -10,7 +10,7 @@ class Connection(NetworkEndpoint):
 		shizzle()
 
 
-def start():
+def start(config):
 	global srv
 	srv = NetworkServer( ('any', 1337), Connection)
 
