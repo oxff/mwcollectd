@@ -105,6 +105,9 @@ public:
 	inline void unregisterLoopable(CoreLoopable * p)
 	{ m_loopables.remove(p); }
 
+	inline const string& getConfigBasepath() const
+	{ return m_configBasepath; }
+
 protected:
 	bool start();
 
