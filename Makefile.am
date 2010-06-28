@@ -11,7 +11,7 @@ install-data-local:
 	$(mkinstalldirs) $(DESTDIR)$(sysconfdir)
 	$(mkinstalldirs) $(DESTDIR)$(sysconfdir)/mwcollectd
 
-	for conf in `find ./conf/ -name '*.conf'`; do \
+	for conf in `find ./conf/ -name '*.conf' -or -name '*.pyconf'`; do \
 		target=$(DESTDIR)$(sysconfdir)/mwcollectd/`basename "$$conf"`; \
 		if [ ! -e "$$target" ]; then \
 			$(INSTALL_DATA) "$$conf" "$$target"; \
