@@ -20,7 +20,10 @@ Possible actions are:
    autoconf             autoreconf; configure
    build                make; make install
    up                   Check if mwcollectd is running and if not start it
+   restart		Send SIGINT to all mwcollectd processes, then run 'up'
    conf                 Upload configuration from local host
+   log			Download the mwcollectd.log file from all hosts.
+   clearlog		Empty the mwcollectd logfile on all hosts.
 """ % sys.argv[0])
 	sys.exit(0)
 
@@ -108,6 +111,24 @@ class CheckUpThread(SshThread):
 			print 'Starting on %s:' % self.name
 			print  '\n'.join(self.execute('cd /opt/mwcollectd; ./sbin/mwcollectd -c etc/mwcollectd/mwcollectd.conf'))
 
+
+class RestartThread(CheckUpThread):
+	def run(self):
+		self.execute('killall -SIGINT mwcollectd')
+
+		CheckUpThread.run(self)
+
+
+class GetLogThread(SshThread):
+	def run(self):
+		sftp = self.client.open_sftp()
+
+		sftp.get('/opt/mwcollectd/var/log/mwcollectd/mwcollectd.log', 'mwcollectd-%s.log' % self.name.replace('.', '_'))
+
+class ClearLogThread(SshThread):
+	def run(self):
+		self.execute('echo \'\' > /opt/mwcollectd/var/log/mwcollectd/mwcollectd.log')
+
 if __name__ == '__main__':
 	username = getpass.getuser()
 	key = None
@@ -149,7 +170,10 @@ if __name__ == '__main__':
 			'autoconf': AutoconfThread,
 			'build': BuildThread,
 			'up': CheckUpThread,
+			'restart': RestartThread,
 			'conf': PushConfThread,
+			'log': GetLogThread,
+			'clearlog': ClearLogThread,
 		}
 
 	if action not in modes:
