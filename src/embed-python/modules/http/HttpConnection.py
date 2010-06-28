@@ -108,18 +108,26 @@ class HttpConnection(NetworkEndpoint):
 						else:
 							del self.currentHeader
 							self.state = self.HTTP_STATE_BODY
-							self.verifyRequest()
+							self.processRequest()
 							return
 				else:
 					return
 
 
-	def verifyRequest(self):
+	def processRequest(self):
 		self.path = urlparse(self.path.decode('latin1'))
 		self.query = parse_qs(self.path.query)
 
+		response = ''
+
+		for key in self.query.keys():
+			if self.query[key][0].find('http://') >= 0:
+				response += self.query[key][0] + '\r\n'
+
+		response = response.encode('utf8')
+
 		self.send(self.protocol + b' 200 Ok\r\nConnection: close\r\nContent-type: text/plain; charset=utf-8\r\n'
-			+ '\r\nThis is nice: ' + repr(self.headers).encode('utf8'))
+				+ b'\r\nFoobar: ' + response)
 		self.close()
 		return
 
