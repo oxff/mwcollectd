@@ -80,7 +80,8 @@ bool HashManager::computationPending()
 		task->receiver->hashComputed(task->type, task->data, \
 			task->length, (uint8_t *) digest, digestsize); \
 		\
-		m_tasks.pop_front(); \
+		if(m_tasks.begin() == task) \
+			m_tasks.pop_front(); \
 	} \
 }
 
