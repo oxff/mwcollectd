@@ -575,6 +575,8 @@ static PyTypeObject mwcollectd_EventSubscriptionType = {
 
 
 
+
+
 static PyObject * mwcollectd_Timeout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	mwcollectd_Timeout * self;
@@ -625,6 +627,8 @@ static PyObject * mwcollectd_Timeout_cancel(mwcollectd_Timeout * self, PyObject 
 	Py_RETURN_NONE;
 }
 
+
+
 static PyMethodDef mwcollectd_Timeout_methods[] = {
 	{ "cancel", (PyObject * (*)(PyObject *, PyObject *)) mwcollectd_Timeout_cancel, METH_NOARGS,
 		"Cancel the live timeout, such that it will be never fired (and free'd)." },
@@ -640,12 +644,74 @@ static PyTypeObject mwcollectd_TimeoutType = {
 	(void (*)(PyObject *)) mwcollectd_Timeout_dealloc,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	Py_TPFLAGS_DEFAULT,
-	"Timeout that is fired exactly once unless deleted prematurely.",
+	"Timeout which fires its receiver exactly once, unless canceled prematurely.",
 	0, 0, 0, 0, 0, 0,
 	mwcollectd_Timeout_methods,
 	0, 0, 0, 0, 0, 0, 0, 0, 0,
 	mwcollectd_Timeout_new
 };
+
+
+
+static PyObject * mwcollectd_HashReceiver_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+static void mwcollectd_HashReceiver_free(PythonHashReceiver::PythonObject * self)
+{
+	delete self->receiver;
+}
+
+static PyObject * mwcollectd_HashReceiver_cancel(PythonHashReceiver::PythonObject * self, PyObject * args)
+{
+	Py_RETURN_NONE;
+}
+
+
+static PyMethodDef mwcollectd_HashReceiver_methods[] = {
+	{ "cancel", (PyObject * (*)(PyObject *, PyObject *)) mwcollectd_HashReceiver_cancel, METH_NOARGS,
+		"Cancel the live timeout, such that it will be never fired (and free'd)." },
+	{ 0, 0, 0, 0 }
+};
+
+	
+static PyTypeObject mwcollectd_HashReceiverType = {
+	PyObject_HEAD_INIT(NULL)
+	"mwcollectd.HashReceiver",
+	sizeof(PythonHashReceiver::PythonObject),
+	0, 
+	0, // (void (*)(PyObject *)) mwcollectd_HashReceiver_dealloc,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	Py_TPFLAGS_DEFAULT,
+	"Asynchronous calculation of a message digest (MD5 or SHA2).",
+	0, 0, 0, 0, 0, 0,
+	mwcollectd_HashReceiver_methods,
+	0, 0, 0, 0, 0, 0, 0, 0, 0,
+	mwcollectd_HashReceiver_new,
+	(void (*)(void *)) mwcollectd_HashReceiver_free,
+};
+
+static PyObject * mwcollectd_HashReceiver_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	size_t hashtype;
+	PyObject * tohash, * receiver;
+
+	if(!PyArg_ParseTuple(args, "iO!O:HashReceiver", &hashtype, &PyBytes_Type, &tohash, &receiver))
+		return 0;
+
+	if(!PyCallable_Check(receiver))
+	{
+		PyErr_Format(PyExc_TypeError, "HashReceiver receiver '%s' is not callable!",
+			EmbedPythonModule::toString(receiver).c_str());
+		return 0;
+	}
+
+	PythonHashReceiver * hashReceiver = new PythonHashReceiver(receiver, tohash, (HashType) hashtype);
+
+	hashReceiver->getPythonObject()->ob_base.ob_refcnt = 2;
+	hashReceiver->getPythonObject()->ob_base.ob_type = &mwcollectd_HashReceiverType;
+	
+	return (PyObject *) hashReceiver->getPythonObject();
+}
+
 
 
 
@@ -827,7 +893,7 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 
 	if(PyType_Ready(&mwcollectd_NetworkEndpointTimeoutsType) < 0 || PyType_Ready(&mwcollectd_EventSubscriptionType) < 0
 		|| PyType_Ready(&mwcollectd_NetworkEndpointType) < 0 || PyType_Ready(&mwcollectd_NetworkServerType) < 0
-		|| PyType_Ready(&mwcollectd_TimeoutType) < 0)
+		|| PyType_Ready(&mwcollectd_TimeoutType) < 0 || PyType_Ready(&mwcollectd_HashReceiverType) < 0)
 	{
 		return 0;
 	}
@@ -839,6 +905,10 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 	PyModule_AddIntConstant(module, "L_SPAM", (long) L_SPAM);
 	PyModule_AddIntConstant(module, "L_INFO", (long) L_INFO);
 	PyModule_AddIntConstant(module, "L_CRIT", (long) L_CRIT);
+
+	PyModule_AddIntConstant(module, "HT_MD5", (long) HT_MD5);
+	PyModule_AddIntConstant(module, "HT_SHA2_256", (long) HT_SHA2_256);
+	PyModule_AddIntConstant(module, "HT_SHA2_512", (long) HT_SHA2_512);
 
 	PyModule_AddStringConstant(module, "version", g_daemon->getVersion());
 
@@ -856,6 +926,9 @@ PyMODINIT_FUNC PyInit_mwcollectd()
 	
 	Py_INCREF(&mwcollectd_TimeoutType);
 	PyModule_AddObject(module, "Timeout", (PyObject *) &mwcollectd_TimeoutType);
+	
+	Py_INCREF(&mwcollectd_HashReceiverType);
+	PyModule_AddObject(module, "HashReceiver", (PyObject *) &mwcollectd_HashReceiverType);
 
 	return module;
 }

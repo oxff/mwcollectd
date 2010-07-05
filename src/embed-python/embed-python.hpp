@@ -288,6 +288,31 @@ typedef struct {
 } mwcollectd_Timeout;
 
 
+class PythonHashReceiver : public HashReceiver
+{
+public:
+	PythonHashReceiver(PyObject * receiverFn, PyObject * toBeHashed, HashType type);
+	virtual ~PythonHashReceiver();
+
+	typedef struct {
+		PyObject_HEAD
+		PythonHashReceiver * receiver;
+	} PythonObject;
+	
+	virtual void hashComputed(HashType type, uint8_t * data,
+		unsigned int dataLength, uint8_t * hash, unsigned int hashLength);
+
+	inline PythonObject * getPythonObject()
+	{ return &m_pythonObject; }
+
+private:
+	PythonObject m_pythonObject;
+
+	PyObject * m_receiverFn;
+	PyObject * m_2bhashed;
+};
+
+
 PyMODINIT_FUNC PyInit_mwcollectd();
 
 

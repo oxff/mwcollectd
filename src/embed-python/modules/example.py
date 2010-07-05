@@ -22,7 +22,9 @@ class DebugEventHandler:
 		log(L_SPAM, '%s: %s' % (name, repr(event)))
 
 
-def start(config):
+def start(config):	
+	HashReceiver(HT_MD5, mwcollectd.version.encode('latin1'), lambda _type, _hashed, _hash: log(L_INFO, "md5('%s') -> %s" % (_hashed.decode('latin1'), _hash)))
+
 	if config:
 		log(L_INFO, 'Example configuration: ' + repr(config))
 	else:

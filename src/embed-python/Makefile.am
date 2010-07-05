@@ -11,6 +11,7 @@ pkglib_LTLIBRARIES = embed-python.la
 embed_python_la_SOURCES  = embed-python.cpp
 embed_python_la_SOURCES += PythonEndpoint.cpp
 embed_python_la_SOURCES += PythonTimeout.cpp
+embed_python_la_SOURCES += PythonHashReceiver.cpp
 embed_python_la_SOURCES += binding.cpp
 embed_python_la_CPPFLAGS = $(PYTHON_CPPFLAGS)
 embed_python_la_LDFLAGS = -module -no-undefined -avoid-version $(PYTHON_LDFLAGS)
