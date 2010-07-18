@@ -145,6 +145,29 @@ if test x"$enable_libemu" = "xyes"; then
 	fi
 fi
 
+dnl **************************************************
+dnl * libpg Support                           	     *
+dnl **************************************************
+
+AC_SUBST([POSTGRESQL_CXXFLAGS])
+AC_SUBST([POSTGRESQL_LDFLAGS])
+
+enable_pgsql="yes"
+
+AC_ARG_ENABLE(pgsql, [  --enable-pgsql    enable postgresql support (default yes)], [enable_pgsql="$enableval"])
+
+if test x"$enable_pgsql" = "xyes"; then
+	AC_CHECK_HEADER([postgresql/libpq-fe.h],[enable_pgsql="yes"],[enable_pgsql=""])
+
+	if test x"$enable_pgsql" = "xyes"; then
+		AC_CHECK_LIB([pq],[PQconnectStart],[enable_pgsql="yes"],[enable_pgsql=""])
+
+		if test x"$enable_pgsql" = "xyes"; then
+			POSTGRESQL_CXXFLAGS="-I/usr/include/postgresql"
+			POSTGRESQL_LDFLAGS="-lpq"
+		fi
+	fi
+fi
 
 
 dnl **************************************************
@@ -468,6 +491,7 @@ AM_CONDITIONAL(LIBEMU_MODULE, [test x$enable_libemu = "xyes"])
 AM_CONDITIONAL(NFQ_MODULE, [test x$enable_nfq = "xyes"])
 AM_CONDITIONAL(PYTHON_MODULE, [test x$enable_python = "xyes"])
 AM_CONDITIONAL(CURL_MODULE, [test x$enable_curl = "xyes"])
+AM_CONDITIONAL(PGSQL_MODULE, [test x$enable_pgsql = "xyes"])
 
 
 
@@ -488,6 +512,7 @@ AC_OUTPUT([
 	src/download-tftp/Makefile
 	src/download-curl/Makefile
 	src/submit-mwserv/Makefile
+	src/postgresql/Makefile
 	])
 
 
@@ -506,4 +531,8 @@ fi
 if test x"$enable_curl" != "xyes"; then
 	AC_MSG_WARN([libcurl not enabled/found, you cannot download http / ftp URLs!])
 	AC_MSG_WARN([libcurl not enabled/found, submit-mwserv not available!])
+fi
+
+if test x"$enable_pgsql" != "xyes"; then
+	AC_MSG_WARN([libpq not enabled/found, modules interacting with a PostgreSQL server will not work!])
 fi

@@ -20,6 +20,10 @@ if CURL_MODULE
 download_curl_dir = download-curl submit-mwserv
 endif
 
+if PGSQL_MODULE
+postgresql_dir = postgresql
+endif
+
 SUBDIRS = core \
 	  log-irc \
 	  $(dynserv_nfqueue_dir) \
@@ -30,6 +34,7 @@ SUBDIRS = core \
 	  log-file \
 	  filestore-binaries \
 	  download-tftp \
-	  $(download_curl_dir)
+	  $(download_curl_dir) \
+	  $(postgresql_dir)
 
 EXTRA_DIST = README
