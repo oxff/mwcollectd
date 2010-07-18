@@ -4,11 +4,11 @@
 
 AUTOMAKE_OPTIONS = foreign
 
-AM_CXXFLAGS = -Wall -Werror -Wno-deprecated -I../../src/ $(POSTGRESQL_CXXFLAGS)
+AM_CXXFLAGS = -Wall -Werror -Wno-deprecated -I../include/ $(POSTGRESQL_CXXFLAGS)
 AM_LDFLAGS =
 
-pkglib_LTLIBRARIES = interface-psql.la
+pkglib_LTLIBRARIES = postgres.la
 
-interface_psql_la_SOURCES  = interface-psql.cpp
-interface_psql_la_SOURCES += PostgresSocket.cpp
-interface_psql_la_LDFLAGS  = -module -no-undefined -avoid-version $(POSTGRESQL_LDFLAGS)
+postgres_la_SOURCES  = interface-psql.cpp
+postgres_la_SOURCES += PostgresSocket.cpp
+postgres_la_LDFLAGS  = -module -no-undefined -avoid-version $(POSTGRESQL_LDFLAGS)
