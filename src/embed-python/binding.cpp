@@ -409,7 +409,7 @@ class PythonEventHandler;
 typedef struct {
 	PyObject_HEAD
 	bool registered;
-	PyObject * handlerType;
+	PyObject * pyHandler;
 	char * name;
 	PythonEventHandler * handler;
 } mwcollectd_EventSubscription;
@@ -471,22 +471,22 @@ public:
 		{
 			PyObject * name = PyUnicode_FromString(ev->getName().c_str());
 			PyObject * args = PyTuple_Pack(2, name, event);
-			PyObject * handler = PyObject_Call((PyObject *) m_subscription->handlerType, args, Py_None);
+			PyObject * res = PyObject_Call((PyObject *) m_subscription->pyHandler, args, Py_None);
 
 			Py_XDECREF(args);
 			Py_DECREF(name);
 			Py_DECREF(event);
 
-			if(!handler)
+			if(!res)
 			{
-				GLOG(L_CRIT, "Creation of event handler %s for '%s' failed:", EmbedPythonModule::toString((PyObject *) m_subscription->handlerType).c_str(),
+				GLOG(L_CRIT, "Invocation of event handler %s for '%s' failed:", EmbedPythonModule::toString((PyObject *) m_subscription->pyHandler).c_str(),
 					m_subscription->name);
 				g_module->logError();
 
 				return;
 			}
 
-			Py_DECREF(handler);
+			Py_DECREF(res);
 		}
 	}
 
@@ -502,7 +502,7 @@ static PyObject * mwcollectd_EventSubscription_new(PyTypeObject *type, PyObject 
 
 	self = (mwcollectd_EventSubscription *) type->tp_alloc(type, 0);
 
-	if(!PyArg_ParseTuple(args, "sO!:EventSubscription", &name, &PyType_Type, &self->handlerType))
+	if(!PyArg_ParseTuple(args, "sO!:EventSubscription", &name, &PyMethod_Type, &self->pyHandler))
 		return 0;
 
 	self->handler = new PythonEventHandler(self);
