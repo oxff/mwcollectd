@@ -509,6 +509,8 @@ static PyObject * mwcollectd_EventSubscription_new(PyTypeObject *type, PyObject 
 	self->registered = false;
 	self->name = strdup(name);
 
+	Py_INCREF(self->pyHandler);
+
 	return (PyObject *) self;
 }
 
@@ -519,6 +521,8 @@ static void mwcollectd_EventSubscription_dealloc(mwcollectd_EventSubscription * 
 
 	free(self->name);
 	delete self->handler;
+
+	Py_DECREF(self->pyHandler);
 
 	Py_TYPE((PyObject *) self)->tp_free(self);
 }
