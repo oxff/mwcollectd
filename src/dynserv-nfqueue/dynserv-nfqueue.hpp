@@ -98,12 +98,11 @@ private:
 	{
 		size_t hits;
 		time_t firstTimestamp;
-
-		unordered_map<uint32_t, list<RateLimit>::iterator>::iterator mapEntry;
+		uint32_t address;
 	};
 
 	typedef list<RateLimit> RateLimitQueue;
-	typedef unordered_map<uint32_t, RateLimitQueue::iterator> RateLimitMap;
+	typedef unordered_map<uint32_t, RateLimit *> RateLimitMap;
 
 	RateLimitQueue m_RateLimitQueue;
 	RateLimitMap m_RateLimitMap;
