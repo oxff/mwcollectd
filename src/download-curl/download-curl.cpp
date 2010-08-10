@@ -46,6 +46,20 @@ DownloadCurlModule::DownloadCurlModule(Daemon * daemon)
 bool DownloadCurlModule::start(Configuration * moduleConfiguration)
 {
 	m_shuttingDown = false;
+
+	if(!moduleConfiguration)
+	{
+		m_measurementInterval = 60;
+		m_minimumSpeed = 4096;
+
+		LOG(L_INFO, "No configuration for download-curl module, assuming default minimum speed of 4 KiB/s measured over 60s intervals.");
+	}
+	else
+	{
+		m_measurementInterval = moduleConfiguration->getInteger(":measurement-interval", 60);
+		m_minimumSpeed = moduleConfiguration->getInteger(":minimum-speed", 4096);
+	}
+
 	return m_daemon->getEventManager()->subscribeEventMask("shellcode.download", this)
 		&& m_daemon->getEventManager()->subscribeEventMask("download.request", this);
 }

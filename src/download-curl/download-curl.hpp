@@ -44,7 +44,7 @@ using namespace std;
 
 class DownloadCurlModule;
 
-class TransferSession : public IOSocket
+class TransferSession : public IOSocket, public TimeoutReceiver
 {
 public:	
 	TransferSession(Daemon * daemon, DownloadCurlModule * handler, StreamRecorder * recorder);
@@ -66,6 +66,8 @@ public:
 	inline void setUserAgent(string ua) { m_userAgent = ua; }
 	inline const string& getUrl() const { return m_url; }
 	inline string getFilename() const { return m_url.substr(m_url.find('/', 9)); }
+	
+	virtual void timeoutFired(Timeout t);
 
 	enum SessionType
 	{
@@ -89,6 +91,9 @@ private:
 	CURL * m_curlHandle;
 	CURLM * m_multiHandle;
 	curl_httppost * m_postInfo, * m_postInfoLast;
+
+	Timeout m_timeout;
+	uint32_t m_lastMeasuredOffset;
 	
 	string m_buffer;
 	
@@ -124,6 +129,12 @@ public:
 		"files via the HTTP(S) / FTP protocol."; }
 	virtual void handleEvent(Event * event);
 
+	inline uint32_t getMeasurementInterval() const
+	{ return m_measurementInterval; }
+
+	inline uint32_t getMinimumSpeed() const
+	{ return m_minimumSpeed; }
+
 protected:
 	virtual void transferSucceeded(TransferSession * transfer,
 		const string& response);
@@ -137,6 +148,8 @@ private:
 	string m_directory;
 	size_t m_refcount;
 	bool m_shuttingDown;
+
+	uint32_t m_measurementInterval, m_minimumSpeed;
 };
 
 extern Daemon * g_daemon;
