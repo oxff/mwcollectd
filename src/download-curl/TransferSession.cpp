@@ -36,14 +36,16 @@ TransferSession::TransferSession(Daemon * daemon, DownloadCurlModule * handler, 
 	m_daemon = daemon;
 	m_handler = handler;
 	m_recorder = rec;
-	
+
 	m_recorder->acquire();
 	
-	if(!(m_curlHandle = curl_easy_init()) || !(m_multiHandle =
-		curl_multi_init()))
+	if(!(m_curlHandle = curl_easy_init()) || !(m_multiHandle = curl_multi_init()))
 	{
 		ASSERT(false);
 	}
+	
+	m_timeout = m_daemon->getTimeoutManager()->scheduleTimeout(handler->getMeasurementInterval(), this);
+	m_lastMeasuredOffset = 0;
 	
 	m_postInfo = m_postInfoLast = 0;
 }
@@ -85,6 +87,7 @@ TransferSession::~TransferSession()
 	}
 	
 	m_daemon->getNetworkManager()->removeSocket(this);
+	m_daemon->getTimeoutManager()->dropTimeout(m_timeout);
 }
 
 bool TransferSession::initiate()
@@ -240,3 +243,20 @@ int TransferSession::getSocket()
 	return maxFd;
 }
 
+void TransferSession::timeoutFired(Timeout t)
+{
+	ASSERT(m_timeout == t);
+
+	uint32_t speed = (m_buffer.size() - m_lastMeasuredOffset) / m_handler->getMeasurementInterval();
+
+	if(speed < m_handler->getMinimumSpeed())
+	{
+		LOG(L_INFO, "Download of \"%s\" was too slow with %u bytes / second.", m_url.c_str(), speed);
+		m_handler->transferFailed(this);
+
+		return;
+	}
+
+	m_lastMeasuredOffset = m_buffer.size();
+	m_timeout = m_daemon->getTimeoutManager()->scheduleTimeout(m_handler->getMeasurementInterval(), this);
+}
