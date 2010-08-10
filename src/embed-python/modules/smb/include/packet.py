@@ -7,7 +7,10 @@
 
 import time
 import itertools
+import logging
+
 from dionaea_compat import *
+logger = Logger('scapy')
 
 
 from .fieldtypes import StrField,ConditionalField,Emph,PacketListField
@@ -630,13 +633,14 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
         self.show(*args,**kargs)
     def show(self, indent=3, lvl="", label_lvl="", goff=0):
         """Prints a hierarchical view of the packet. "indent" gives the size of indentation for each layer."""
-        return
+#        return
         logger.debug("%s%s %s sizeof(%i) %s " % (label_lvl,
                               "###[",
                               self.name, self.size(),
                               "]###"))
         off=0
         for f in self.fields_desc:
+            size = 0
             if isinstance(f, ConditionalField) and not f._evalcond(self):
                 continue
             fvalue = self.getfieldval(f.name)
@@ -644,6 +648,7 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
                 logger.debug("%s  \\%-10s\\" % (label_lvl+lvl, f.name))
                 fvalue_gen = SetGen(fvalue,_iterpacket=0)
                 for fvalue in fvalue_gen:
+                    size = fvalue.size()
                     fvalue.show(indent=indent, label_lvl=label_lvl+lvl+"   |", goff=goff)
             else:
                 size = f.size(self,fvalue)
@@ -654,8 +659,8 @@ class Packet(BasePacket, metaclass=Packet_metaclass):
                                           size,
                                           off,
                                           goff))
-                off += size
-                goff +=size
+            off += size
+            goff +=size
         self.payload.show(indent=indent, lvl=lvl+(" "*indent*self.show_indent), label_lvl=label_lvl, goff=goff)
     def show2(self):
         """Prints a hierarchical view of an assembled version of the packet, so that automatic fields are calculated (checksums, etc.)"""
@@ -801,7 +806,7 @@ A side effect is that, to obtain "{" and "}" characters, you must use
     def decode_payload_as(self,cls):
         """Reassembles the payload and decode it using another packet class"""
         s = self.payload.build()
-        self.payload = cls(s)
+        self.payload = cls(s, _underlayer=self)
 
     def command(self):
         """Returns a string representing the command you have to type to obtain the same packet"""

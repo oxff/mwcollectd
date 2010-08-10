@@ -349,12 +349,11 @@ bool DynamicServerNfqueue::limitSource(uint32_t address)
 		RateLimit rl;
 
 		rl.hits = 1;
-		rl.firstTimestamp = time(0);
+		time(&rl.firstTimestamp);
+		rl.address = address;
 
-		RateLimitQueue::iterator queueIterator = m_RateLimitQueue.insert(m_RateLimitQueue.end(), rl);
-		RateLimitMap::iterator mapIterator = m_RateLimitMap.insert(RateLimitMap::value_type(address, queueIterator)).first;
-
-		queueIterator->mapEntry = mapIterator;
+		RateLimitQueue::iterator it = m_RateLimitQueue.insert(m_RateLimitQueue.end(), rl);
+		m_RateLimitMap.insert(RateLimitMap::value_type(address, & *it));
 	}
 
 	return false;
@@ -367,7 +366,7 @@ void DynamicServerNfqueue::timeoutFired(Timeout timeout)
 	RateLimitQueue::iterator it;
 
 	for(it = m_RateLimitQueue.begin(); it != m_RateLimitQueue.end() && it->firstTimestamp + m_limitTimeout < now; ++it)
-		m_RateLimitMap.erase(it->mapEntry);
+		m_RateLimitMap.erase(it->address);
 
 	m_RateLimitQueue.erase(m_RateLimitQueue.begin(), it);
 
