@@ -262,7 +262,7 @@ bool EmbedPythonModule::addSubconf(PyObject * parent, const string& path, Config
 
 	for(vector<string>::iterator it = subkeys.begin(); it != subkeys.end(); ++it)
 	{
-		PyObject * child;
+		PyObject * child = NULL;
 
 		switch(config->nodeType((path + * it).c_str()))
 		{

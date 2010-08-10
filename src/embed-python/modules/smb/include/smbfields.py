@@ -690,15 +690,18 @@ class SMB_Negociate_Protocol_Response(Packet):
 		LEIntField("MaxBufferS",4096),
 		LEIntField("MaxRawBuffer",65536),
 		LEIntField("SessionKey",0),
-		FlagsField("Capabilities", 0x8000e3fd, -32, SMB_Negotiate_Capabilities),
+		FlagsField("Capabilities", 0x0000e3fd, -32, SMB_Negotiate_Capabilities),
 		NTTimeField("SystemTime",datetime.datetime.now()),
 		ShortField("SystemTimeZone",0xc4ff),
-		ByteField("KeyLength", 0),
+		ByteField("KeyLength", 8),
 		#LEShortField("ByteCount", 16),
-		MultiFieldLenField("ByteCount", None, fmt='<H', length_of=("EncryptionKey","OemDomainName", "ServerGUID", "SecurityBlob")),
+		MultiFieldLenField("ByteCount", None, fmt='<H', length_of=("EncryptionKey","OemDomainName","ServerName", "ServerGUID", "SecurityBlob")),
 		# without CAP_EXTENDED_SECURITY
-		ConditionalField(StrNullField("EncryptionKey", b'test'), lambda x: not x.Capabilities & CAP_EXTENDED_SECURITY),
-		ConditionalField(StrNullField("OemDomainName", b'WORKGROUP'), lambda x: not x.Capabilities & CAP_EXTENDED_SECURITY),
+		ConditionalField(StrLenField("EncryptionKey", b'AABBCCDD',length_from=lambda x: 0), lambda x: not x.Capabilities & CAP_EXTENDED_SECURITY),
+		ConditionalField(UnicodeNullField("OemDomainName", "WORKGROUP"), lambda x: not x.Capabilities & CAP_EXTENDED_SECURITY),
+		# In [MS-SMB].pdf page 49, 
+		# "ServerName" field needed for case without CAP_EXTENDED_SECURITY
+		ConditionalField(UnicodeNullField("ServerName", "HOMEUSER-3AF6FE"), lambda x: not x.Capabilities & CAP_EXTENDED_SECURITY),
 		# with CAP_EXTENDED_SECURITY
 		ConditionalField(StrLenField("ServerGUID", b'\x0B\xFF\x65\x38\x54\x7E\x6C\x42\xA4\x3E\x12\xD2\x11\x97\x16\x44', length_from=lambda x: 16), lambda x: x.Capabilities & CAP_EXTENDED_SECURITY),
 		ConditionalField(StrLenField("SecurityBlob", b'', length_from=lambda x: 0), lambda x: x.Capabilities & CAP_EXTENDED_SECURITY),
@@ -748,8 +751,8 @@ class SMB_Sessionsetup_ESEC_AndX_Response(Packet):
 		LEShortField("AndXOffset",0),
 		XLEShortField("Action",1),
 		FieldLenField("SecurityBlobLength", None, fmt='<H', length_of="SecurityBlob"),
+		MultiFieldLenField("ByteCount", None, fmt='<H', length_of=("Padding","NativeOS", "NativeLanManager", "PrimaryDomain","SecurityBlob")),
 		StrLenField("SecurityBlob", "", length_from=lambda x:x.SecurityBlobLength),
-		MultiFieldLenField("ByteCount", None, fmt='<H', length_of=("Padding","NativeOS", "NativeLanManager", "PrimaryDomain")),
 		ConditionalField(StrFixedLenField("Padding", "\x00", length_from=lambda x:(len(x.SecurityBlob)+1)%2), lambda x:x.underlayer.Flags2 & SMB_FLAGS2_UNICODE),
 		SMBNullField("NativeOS","Windows 5.1", utf16=lambda x:x.underlayer.Flags2 & SMB_FLAGS2_UNICODE),
 		SMBNullField("NativeLanManager","Windows 2000 LAN Manager", utf16=lambda x:x.underlayer.Flags2 & SMB_FLAGS2_UNICODE),
@@ -902,6 +905,34 @@ class SMB_Treeconnect_AndX_Response(Packet):
 		StrNullField("NativeFilesystem",""),
 	]
 
+#[MS-SMB].pdf
+#Page 62
+class SMB_Treeconnect_AndX_Response_Extended(Packet):
+	name="SMB Treeconnect AndX Response Extended"
+	smb_cmd = SMB_COM_TREE_CONNECT_ANDX #0x75
+	fields_desc = [
+		ByteField("WordCount",7),
+		ByteEnumField("AndXCommand",0xff,SMB_Commands),
+		ByteField("Reserved1",0),
+		LEShortField("AndXOffset",56), #windows xp gives senseless 56
+		XLEShortField("OptSupport",0x0001),
+		FlagsField("MaximalShareAccessRights", 0x01ff, -32, SMB_AccessMask),
+		FlagsField("GuestMaximalShareAccessRights", 0x01ff, -32, SMB_AccessMask),
+		LEShortField("ByteCount",7),
+		StrNullField("Service","IPC"),
+		ConditionalField(StrFixedLenField("Padding", b'\0', 2), lambda x:x.underlayer.Flags2 & SMB_FLAGS2_UNICODE),
+		StrNullField("NativeFileSystem",""),	
+	]
+
+# Used when the error's return is needed
+class SMB_Treeconnect_AndX_Response2(Packet):
+	name="SMB Treeconnect AndX Response2"
+	smb_cmd = SMB_COM_TREE_CONNECT_ANDX #0x75
+	fields_desc = [
+		ByteField("WordCount",0),
+		LEShortField("ByteCount",0),
+	]
+
 # page 76
 class SMB_NTcreate_AndX_Request(Packet):
 	name = "SMB NTcreate AndX Request"
@@ -981,14 +1012,14 @@ class SMB_Write_AndX_Request(Packet):
 		XLEShortField("FID",0),
 		LEIntField("Offset",0),
 		XIntField("Reserved2",0xffffffff),
-		XLEShortField("WriteMode",8),
+		FlagsField("WriteMode", 0, -16, SMB_WriteMode),
 		FieldLenField("Remaining", None, fmt='<H', length_of="Data"),
 		LEShortField("DataLenHigh",0), #multiply with 64k		
 		LEShortField("DataLenLow",0),
 		LEShortField("DataOffset",0),
 		ConditionalField(IntField("HighOffset",0), lambda x:x.WordCount==14),
-		XLEShortField("ByteCount",  0),
-		ConditionalField(XLEShortField("PipeWriteLen", 0), lambda x:x.WriteMode & SMB_WM_MSGSTART and x.WriteMode & SMB_WM_WRITERAW),
+		LEShortField("ByteCount",  0),
+		ConditionalField(LEShortField("PipeWriteLen", 0), lambda x:x.WriteMode & SMB_WM_MSGSTART and x.WriteMode & SMB_WM_WRITERAW),
 		StrLenField("Padding", None, length_from=lambda x:x.ByteCount-((x.DataLenHigh<<16)|x.DataLenLow)),
 		StrLenField("Data", b"", length_from=lambda x:((x.DataLenHigh<<16)|x.DataLenLow)),
 	]
@@ -1082,12 +1113,13 @@ class SMB_Trans_Request(Packet):
 		ConditionalField(StrFixedLenField("Padding", b'\0', 1), lambda x:x.underlayer.Flags2 & SMB_FLAGS2_UNICODE),
 		SMBNullField("TransactionName",b"\\PIPE\\", utf16=lambda x:x.underlayer.Flags2 & SMB_FLAGS2_UNICODE),
 		StrFixedLenField("Pad", b"", length_from=lambda x:x.lengthfrom_Pad()),
-		FieldListField("Param", 0, ByteField("", 0), count_from = lambda pkt: pkt.ParamCount), 
+		FieldListField("Param", 0, XByteField("", 0), count_from = lambda pkt: pkt.ParamCount), 
 		StrFixedLenField("Pad1", b"", length_from=lambda x:x.lengthfrom_Pad1()),
 #		StrFixedLenField("Pad1", b"", length_from=lambda x:x.lengthfrom_Pad1() ),
 	]
 	def lengthfrom_Pad(self):
-		r = self.ParamOffset		# ...
+		if self.ParamOffset == 0:
+			return 0
 		r = self.underlayer.size()	# underlayer size removed
 		r += 5						# 5 byte vars
 		r += 11*2					# 11 words
@@ -1101,12 +1133,19 @@ class SMB_Trans_Request(Packet):
 		return r
 
 	def lengthfrom_Pad1(self):
-		r = self.ByteCount
+		if self.DataOffset == 0:
+			return 0
+		r = self.underlayer.size()	# underlayer size removed
+		r += 5						# 5 byte vars
+		r += 11*2					# 11 words
+		r += 4						# 1 int
+		r += self.SetupCount*2			# SetupCount words
 		if hasattr(self, 'Padding') and self.Padding != None:
-			r -= len(self.Padding)		# optional Padding 
-		r -= len(self.TransactionName)	# TransactionName
-		r -= len(self.Pad)
-		r -= self.ParamCount
+			r += len(self.Padding)		# optional Padding 
+		r += len(self.TransactionName)	# TransactionName
+		r += len(self.Pad)				# Param Padding
+		r += self.ParamCount			# Param
+		r = self.DataOffset - r
 		return r
 
 
@@ -1159,18 +1198,27 @@ class SMB_Trans2_Request(Packet):
 		StrFixedLenField("Data", b"", length_from=lambda pkt: pkt.DataCount), 
 	]
 	def lengthfrom_Pad(self):
+		if self.ParamOffset == 0:
+			return 0
 		r = self.underlayer.size()	# underlayer size removed
 		r += 5						# 5 byte vars
 		r += 11*2					# 11 words
 		r += 4						# 1 int
-		r += self.SetupCount*2			# SetupCount words
+		r += self.SetupCount*2		# SetupCount words
 		return self.ParamOffset - r
 
 	def lengthfrom_Pad1(self):
 		if self.DataOffset == 0:
 			return 0
-		else:
-			return self.DataOffset - ( self.ParamOffset + self.ParamCount )
+		r = self.underlayer.size()	# underlayer size removed
+		r += 5						# 5 byte vars
+		r += 11*2					# 11 words
+		r += 4						# 1 int
+		r += self.SetupCount*2		# SetupCount words
+		r += len(self.Pad)			# Pad length
+		r += self.ParamCount		# ParamCount arguments
+		return self.DataOffset - r
+
 
 #		if r % 2 == 0:
 #			return r % 4
@@ -1269,6 +1317,25 @@ class SMB_Echo(Packet):
 		StrLenField("Buffer", "\xff", length_from=lambda x:x.ByteCount),
 	]
 
+# page 89
+class SMB_Delete_Request(Packet):
+	name = "SMB Delete Request"
+	smb_cmd = SMB_COM_DELETE #0x06
+	fields_desc = [
+		ByteField("WordCount",1),
+		FlagsField("SearchAttributes", 0, -16, SMB_FileAttributes),
+		FieldLenField("ByteCount", 1, fmt='<H', length_of="FileName"),
+		ByteField("BufferFormat",1),
+		StrLenField("FileName", "\xff", length_from=lambda x:x.ByteCount),
+	]
+
+class SMB_Delete_Response(Packet):
+	name = "SMB Delete Response"
+	smb_cmd = SMB_COM_DELETE
+	fields_desc = [
+		ByteField("WordCount",0),
+		LEShortField("ByteCount",0),
+	]
 
 class DCERPC_Header(Packet):
 	name = "DCERPC Header"
@@ -1354,24 +1421,6 @@ class DCERPC_Auth_Verfier(Packet):
 		XIntField("ContextID", 0),
 	]
 
-class NTLMSSP_Header(Packet):
-	"""
-	http://davenport.sourceforge.net/ntlm.html#theType1Message
-	"""
-	name = "NTLMSSP Header"
-	fields_desc = [
-		StrFixedLenField("Identifier", "NTLMSSP\0", 8),
-		XLEIntField("MessageType",0),
-		XLEIntField("Flags",0),
-		StrFixedLenField("Domain","",8),
-		StrFixedLenField("Workstation","",8),
-		StrFixedLenField("OSVersion","",8),
-#		IntEnumField("MessageType",)
-#		IntFlagsField("Flags", 0),
-	]
-
-
-		
 class DCERPC_Bind_Ack(Packet):
 	name = "DCERPC Bind Ack"
 	fields_desc = [
@@ -1381,11 +1430,10 @@ class DCERPC_Bind_Ack(Packet):
 		FieldLenField("SecondAddrLen", 14, fmt='<H', length_of="SecondAddr"),
 		StrLenField("SecondAddr", "\\PIPE\\browser\0", length_from=lambda x:x.SecondAddrLen),
 #		ByteField("NumCtxItems",1),
-        FieldLenField("NumCtxItems", 0, fmt='B', count_of="CtxItems"),
+		FieldLenField("NumCtxItems", 0, fmt='B', count_of="CtxItems"),
 		StrLenField("FixGap", "\0"*3, length_from=lambda x:3),
-        PacketListField("CtxItems", 0, DCERPC_Ack_CtxItem, count_from=lambda pkt:pkt.NumCtxItems)
+		PacketListField("CtxItems", 0, DCERPC_Ack_CtxItem, count_from=lambda pkt:pkt.NumCtxItems)
 	]
-
 
 bind_bottom_up(NBTSession, NBTSession_Request, TYPE = lambda x: x==0x81)
 bind_bottom_up(NBTSession, SMB_Header, TYPE = lambda x: x==0)
@@ -1398,6 +1446,8 @@ bind_bottom_up(SMB_Header, SMB_Sessionsetup_ESEC_AndX_Request, Command=lambda x:
 bind_bottom_up(SMB_Header, SMB_Treedisconnect, Command=lambda x: x==0x71)
 bind_bottom_up(SMB_Header, SMB_Treeconnect_AndX_Request, Command=lambda x: x==0x75, Flags=lambda x: not x&0x80)
 bind_bottom_up(SMB_Header, SMB_Treeconnect_AndX_Response, Command=lambda x: x==0x75, Flags=lambda x: x&0x80)
+bind_bottom_up(SMB_Header, SMB_Treeconnect_AndX_Response2, Command=lambda x: x==0x75, Flags=lambda x: x&0x80)
+#bind_bottom_up(SMB_Header, SMB_Treeconnect_AndX_Response_Extended, Command=lambda x: x==0x75, Flags=lambda x: x&0x80)
 bind_bottom_up(SMB_Header, SMB_NTcreate_AndX_Request, Command=lambda x: x==0xa2, Flags=lambda x: not x&0x80)
 bind_bottom_up(SMB_Header, SMB_NTcreate_AndX_Response, Command=lambda x: x==0xa2, Flags=lambda x: x&0x80)
 bind_bottom_up(SMB_Header, SMB_Trans_Request, Command=lambda x: x==0x25, Flags=lambda x: not x&0x80)
@@ -1413,6 +1463,7 @@ bind_bottom_up(SMB_Header, SMB_Open_AndX_Request, Command=lambda x: x==0x2d, Fla
 bind_bottom_up(SMB_Header, SMB_Close, Command=lambda x: x==SMB_COM_CLOSE)
 bind_bottom_up(SMB_Header, SMB_Logoff_AndX, Command=lambda x: x==SMB_COM_LOGOFF_ANDX)
 bind_bottom_up(SMB_Header, SMB_Echo, Command=lambda x: x==SMB_COM_ECHO)
+bind_bottom_up(SMB_Header, SMB_Delete_Request, Command=lambda x: x==SMB_COM_DELETE, Flags=lambda x: not x&0x80)
 
 #bind_bottom_up(SMB_Write_AndX_Request, SMB_Data)
 bind_bottom_up(SMB_Read_AndX_Response, SMB_Data)
@@ -1435,6 +1486,8 @@ bind_top_down(SMB_Header, SMB_Negociate_Protocol_Response, Command=0x72)
 bind_top_down(SMB_Header, SMB_Sessionsetup_AndX_Response2, Command=0x73)
 bind_top_down(SMB_Header, SMB_Sessionsetup_ESEC_AndX_Response, Command=0x73)
 bind_top_down(SMB_Header, SMB_Treeconnect_AndX_Response, Command=0x75)
+bind_top_down(SMB_Header, SMB_Treeconnect_AndX_Response2, Command=0x75)
+#bind_top_down(SMB_Header, SMB_Treeconnect_AndX_Response_Extended, Command=0x75)
 bind_top_down(SMB_Header, SMB_Treedisconnect, Command=0x71)
 bind_top_down(SMB_Header, SMB_NTcreate_AndX_Response, Command=0xa2)
 bind_top_down(SMB_Header, SMB_Write_AndX_Response, Command=0x2f)
@@ -1448,5 +1501,5 @@ bind_top_down(DCERPC_Header, DCERPC_Request, PacketType=0)
 bind_top_down(DCERPC_Header, DCERPC_Response, PacketType=2)
 bind_top_down(DCERPC_Header, DCERPC_Bind, PacketType=11)
 bind_top_down(DCERPC_Header, DCERPC_Bind_Ack, PacketType=12)
-bind_bottom_up(DCERPC_Auth_Verfier, NTLMSSP_Header, Type=lambda x: x==10)
+#bind_bottom_up(DCERPC_Auth_Verfier, NTLMSSP_Header, Type=lambda x: x==10)
 
