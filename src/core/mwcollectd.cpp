@@ -54,7 +54,7 @@ void sigint_handler(int signal)
 int main(int argc, char * argv[])
 {
 	const char * configPath = PREFIX "/etc/mwcollectd/mwcollectd.conf";
-	const char * changeUser = 0;
+	char * changeUser = 0;
 	bool backgroundDaemon = true;
 
 	char option;
@@ -107,7 +107,7 @@ int main(int argc, char * argv[])
 
 		signal(SIGINT, sigint_handler);
 
-		if(!daemon.run())
+		if(!daemon.run(changeUser))
 		{
 			if(!backgroundDaemon)
 				puts("Daemon startup failed.");

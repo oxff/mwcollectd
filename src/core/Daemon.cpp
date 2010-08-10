@@ -109,20 +109,6 @@ bool Daemon::run(char * changeUser)
 			* changeGroup++ = 0;
 
 		// TODO FIXME: getpwnam and setrlimit HAVE_ checks
-		if((changeUserInfo = getpwnam(changeUser)) != NULL)
-		{
-			if(seteuid(changeUserInfo->pw_uid) == -1)
-			{
-				perror("Failed to set effective user id");
-				return false;
-			}
-		}
-		else
-		{
-			perror("Could not resolve change user");
-			return false;
-		}
-
 		if(changeGroup)
 		{
 			if((changeGroupInfo = getgrnam(changeGroup)) != NULL)
@@ -138,6 +124,20 @@ bool Daemon::run(char * changeUser)
 				perror("Could not resolve change group");
 				return false;
 			}
+		}
+
+		if((changeUserInfo = getpwnam(changeUser)) != NULL)
+		{
+			if(seteuid(changeUserInfo->pw_uid) == -1)
+			{
+				perror("Failed to set effective user id");
+				return false;
+			}
+		}
+		else
+		{
+			perror("Could not resolve change user");
+			return false;
 		}
 	}
 
