@@ -502,8 +502,14 @@ static PyObject * mwcollectd_EventSubscription_new(PyTypeObject *type, PyObject 
 
 	self = (mwcollectd_EventSubscription *) type->tp_alloc(type, 0);
 
-	if(!PyArg_ParseTuple(args, "sO!:EventSubscription", &name, &PyMethod_Type, &self->pyHandler))
+	if(!PyArg_ParseTuple(args, "sO:EventSubscription", &name, &self->pyHandler))
 		return 0;
+
+	if(!PyCallable_Check(self->pyHandler))
+	{
+		PyErr_Format(PyExc_TypeError, "Event handler object '%s' is not callable.", EmbedPythonModule::toString(self->pyHandler).c_str());
+		return 0;
+	}
 
 	self->handler = new PythonEventHandler(self);
 	self->registered = false;
