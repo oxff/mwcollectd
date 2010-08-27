@@ -9,5 +9,5 @@ AM_LDFLAGS =
 pkglib_LTLIBRARIES = download-curl.la
 
 download_curl_la_SOURCES  = download-curl.cpp
-download_curl_la_SOURCES += TransferSession.cpp
+download_curl_la_SOURCES += CurlSocket.cpp
 download_curl_la_LDFLAGS  = -module -no-undefined -avoid-version $(LIB_CURL)

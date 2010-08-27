@@ -6,7 +6,7 @@
  *	|_| |_| |_|\_/\_/ \___\___/|_|_|\___|\___|\__\__,_|
  *
  *
- * 	Copyright 2009 Georg Wicherski, Kaspersky Labs GmbH
+ * 	Copyright 2009-2010 Georg Wicherski, Kaspersky Labs GmbH
  *
  *
  *	This file is part of mwcollectd.
@@ -42,92 +42,57 @@ using namespace mwcollectd;
 using namespace std;
 
 
-class DownloadCurlModule;
-
-class TransferSession : public IOSocket, public TimeoutReceiver
+class CurlSocket : public IOSocket
 {
-public:	
-	TransferSession(Daemon * daemon, DownloadCurlModule * handler, StreamRecorder * recorder);
-	TransferSession(Daemon * daemon, DownloadCurlModule * handler, const string& typeName);
-	~TransferSession();
-	
+public:
+	inline CurlSocket(int fd)
+		: m_fd(fd)
+	{}
+
+	virtual ~CurlSocket() { }
+
 	virtual void pollRead();
 	virtual void pollWrite();
 	virtual void pollError();
-	
-	bool initiate();
-	void addPostField(string name, string value);
-	void abort();
-
-	inline StreamRecorder * getRecorder() const { return m_recorder; }
-	inline const string& getTypeName() const { return m_typeName; }
-	
-	inline void setUrl(const string& url) { m_url = url; }
-	inline void setUserAgent(string ua) { m_userAgent = ua; }
-	inline const string& getUrl() const { return m_url; }
-	inline string getFilename() const { return m_url.substr(m_url.find('/', 9)); }
-	
-	virtual void timeoutFired(Timeout t);
-
-	enum SessionType
-	{
-		ST_SHELLCODE,
-		ST_GENERIC,
-	};
-
-	inline SessionType getType() const { return m_type; }
-
-	inline void * getOpaque() const { return m_opaque; }
-	inline void setOpaque(void * o) { m_opaque = o; }
-
-
-protected:	
-	static size_t readData(void *buffer, size_t size, size_t n, void *data);
-	
-	int getSocket();
-	bool wantSend();
 
 private:
-	CURL * m_curlHandle;
-	CURLM * m_multiHandle;
-	curl_httppost * m_postInfo, * m_postInfoLast;
-
-	Timeout m_timeout;
-	uint32_t m_lastMeasuredOffset;
-	
-	string m_buffer;
-	
-	Daemon * m_daemon;
-	DownloadCurlModule * m_handler;
-
-	union {
-		StreamRecorder * m_recorder;
-		void * m_opaque;
-	};
-
-	string m_typeName;
-
-	SessionType m_type;
-	
-private:
-	string m_url, m_userAgent;
+	int m_fd;
 };
 
+struct Transfer
+{
+	enum TransferType
+	{
+		TT_GENERIC,
+		TT_SHELLCODE,
+	};
 
+	Transfer(TransferType t)
+		: type(t), opaque(0)
+	{ }
 
-class DownloadCurlModule : public Module, public EventSubscriber
+	TransferType type;
+	string buffer;
+
+	string url;
+	void * opaque;
+};
+
+class DownloadCurlModule : public Module, public EventSubscriber, public TimeoutReceiver
 {
 public:
 	DownloadCurlModule(Daemon * daemon);
-	virtual ~DownloadCurlModule() { }
+	virtual ~DownloadCurlModule();
 
 	virtual bool start(Configuration * moduleConfiguration);
 	virtual bool stop();
 
 	virtual const char * getName() { return "download-curl"; }
 	virtual const char * getDescription() { return "Download remote "
-		"files via the HTTP(S) / FTP protocol."; }
+		"files via the protocols, such as HTTP(S) & FTP."; }
 	virtual void handleEvent(Event * event);
+
+	virtual void timeoutFired(Timeout t);
 
 	inline uint32_t getMeasurementInterval() const
 	{ return m_measurementInterval; }
@@ -135,12 +100,16 @@ public:
 	inline uint32_t getMinimumSpeed() const
 	{ return m_minimumSpeed; }
 
-protected:
-	virtual void transferSucceeded(TransferSession * transfer,
-		const string& response);
-	virtual void transferFailed(TransferSession * transfer);
+	inline CURLM * getCurlMulti() const
+	{ return m_curlMulti; }
 
-	friend class TransferSession;
+protected:
+	int socketCallback(CURL * easy, curl_socket_t s, int action, CurlSocket * socket);
+	static int curlSocketCallback(CURL * easy, curl_socket_t s, int action, DownloadCurlModule * module, CurlSocket * socket);
+	static int curlTimeoutCallback(CURLM * multi, long timeout, DownloadCurlModule * module);
+
+	void checkFinished(int remaining);
+	friend class CurlSocket;
 
 private:
 	Daemon * m_daemon;
@@ -150,9 +119,15 @@ private:
 	bool m_shuttingDown;
 
 	uint32_t m_measurementInterval, m_minimumSpeed;
+
+	CURLM * m_curlMulti;
+
+	Timeout m_curlTimeout;
 };
 
+
 extern Daemon * g_daemon;
+extern DownloadCurlModule * g_module;
 
 
 #endif // __MWCOLLECTD_DOWNLOADCURL_HPP
