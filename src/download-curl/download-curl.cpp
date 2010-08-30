@@ -76,8 +76,14 @@ bool DownloadCurlModule::start(Configuration * moduleConfiguration)
 		m_minimumSpeed = moduleConfiguration->getInteger(":minimum-speed", 4096);
 	}
 
-	return m_daemon->getEventManager()->subscribeEventMask("shellcode.download", this)
-		&& m_daemon->getEventManager()->subscribeEventMask("download.request", this);
+	if(m_daemon->getEventManager()->subscribeEventMask("shellcode.download", this)
+		&& m_daemon->getEventManager()->subscribeEventMask("download.request", this))
+	{
+		LOG(L_INFO, "download-curl with %s ready.", curl_version());
+		return true;
+	}
+
+	return false;
 }
 
 void DownloadCurlModule::handleEvent(Event * event)
@@ -91,16 +97,20 @@ void DownloadCurlModule::handleEvent(Event * event)
 
 		Transfer * transfer = new Transfer(Transfer::TT_SHELLCODE);
 		transfer->url = url;
+		transfer->recorder = (StreamRecorder *) (* event)["recorder"].getPointerValue();
+		transfer->recorder->acquire();
 
 		CURL * easy = curl_easy_init();
 
 		curl_easy_setopt(easy, CURLOPT_URL, transfer->url.c_str());
+		curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+		curl_easy_setopt(easy, CURLOPT_WRITEDATA, transfer);
 		curl_easy_setopt(easy, CURLOPT_PRIVATE, transfer);
+		curl_easy_setopt(easy, CURLOPT_FILETIME, 1L);
+		curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 0L);
 
 		curl_multi_add_handle(m_curlMulti, easy);
 		++m_refcount;
-
-		// TODO FIXME: perform until really added
 	}
 	else if(* (* event) == "download.request")
 	{
@@ -108,14 +118,22 @@ void DownloadCurlModule::handleEvent(Event * event)
 
 		Transfer * transfer = new Transfer(Transfer::TT_GENERIC);
 		transfer->url = * (* event)["url"];
+		transfer->usertype = * (* event)["type"];
 
 		CURL * easy = curl_easy_init();
 		
 		curl_easy_setopt(easy, CURLOPT_URL, transfer->url.c_str());
+		curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+		curl_easy_setopt(easy, CURLOPT_WRITEDATA, transfer);
 		curl_easy_setopt(easy, CURLOPT_PRIVATE, transfer);
 
 		if(event->hasAttribute("ua"))
 			curl_easy_setopt(easy, CURLOPT_USERAGENT, (* (* event)["ua"]).c_str());
+
+		if(event->hasAttribute("ssl-verify") && (* event)["ssl-verify"].getIntegerValue())
+			curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
+		else
+			curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 0L);
 		
 		if(event->hasAttribute("postfields"))
 		{
@@ -150,11 +168,11 @@ void DownloadCurlModule::handleEvent(Event * event)
 
 		if(event->hasAttribute("opaque"))
 			transfer->opaque = (* event)["opaque"].getPointerValue();
+		else
+			transfer->opaque = 0;
 		
 		curl_multi_add_handle(m_curlMulti, easy);
 		++m_refcount;
-
-		// TODO FIXME: perform until really added
 	}
 }
 
@@ -244,12 +262,19 @@ void DownloadCurlModule::timeoutFired(Timeout t)
 	}
 }
 
+int DownloadCurlModule::curlWriteCallback(void * data, size_t block, size_t nblocks, Transfer * transfer)
+{
+	transfer->buffer.append((char *) data, block * nblocks);
+	return block * nblocks;
+}
+
 void DownloadCurlModule::checkFinished(int remaining)
 {
 	CURL * easy;
 	CURLcode result;
 	CURLMsg * message;
 	int messagesLeft;
+	Transfer * transfer;
 
 	if((size_t) remaining == m_refcount)
 		return;
@@ -264,7 +289,7 @@ void DownloadCurlModule::checkFinished(int remaining)
 		{
 			message = curl_multi_info_read(m_curlMulti, &messagesLeft);
 
-			if(message->msg == CURLMSG_DONE)
+			if(message && message->msg == CURLMSG_DONE)
 			{
 				easy = message->easy_handle;
 				result = message->data.result;
@@ -276,80 +301,109 @@ void DownloadCurlModule::checkFinished(int remaining)
 		if(!easy)
 			break;
 
-		// TODO: process transfer here
+		curl_easy_getinfo(easy, CURLINFO_PRIVATE, &transfer);
+
+		if(result == CURLE_OK)
+		{
+			switch(transfer->type)
+			{
+				case Transfer::TT_GENERIC:
+				{
+					const char * effectiveUrl = 0;
+					Event ev = Event("download.result.success");
+
+					ev["type"] = transfer->usertype;
+					ev["url"] = transfer->url;
+					ev["response"] = transfer->buffer;
+
+					if(transfer->opaque)
+						ev["opaque"] = transfer->opaque;
+					
+					if(curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &effectiveUrl) == CURLE_OK && effectiveUrl)
+						ev["effective-url"] = effectiveUrl;
+
+					m_daemon->getEventManager()->fireEvent(&ev);
+					break;
+				}
+
+				case Transfer::TT_SHELLCODE:
+				{
+					string filename = transfer->url.substr(transfer->url.rfind('/') + 1);
+					Event ev = Event("shellcode.file");
+					const char * effectiveUrl = 0, * primaryAddress = 0;
+					long filetime = 0, responseCode = 0;
+
+					transfer->recorder->setProperty(("file:" + filename).c_str(), transfer->buffer);
+					transfer->recorder->setProperty(("url:" + filename).c_str(), transfer->url);
+			
+					if(curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &effectiveUrl) == CURLE_OK && effectiveUrl)
+						transfer->recorder->setProperty(("effective-url:" + filename).c_str(), effectiveUrl);
+					
+					if(curl_easy_getinfo(easy, CURLINFO_PRIMARY_IP, &primaryAddress) == CURLE_OK && primaryAddress)
+						transfer->recorder->setProperty(("ip:" + filename).c_str(), primaryAddress);
+					
+					if(curl_easy_getinfo(easy, CURLINFO_FILETIME, &filetime) == CURLE_OK && filetime > 0)
+					{
+						char timebuf[32];
+						
+						sprintf(timebuf, "%lu", filetime);
+						transfer->recorder->setProperty(("filetime:" + filename).c_str(), timebuf);
+					}
+			
+					if(curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &responseCode) == CURLE_OK && responseCode)
+					{
+						if(responseCode < 200 || responseCode >= 300)
+						{
+							LOG(L_SPAM, "Discarding shellcode download from %s due to code %u.", transfer->url.c_str(), responseCode);
+							transfer->recorder->release();
+							break;
+						}
+					}
+
+					ev["recorder"] = (void *) transfer->recorder;
+					ev["name"] = filename;
+					ev["url"] = transfer->url;
+
+					transfer->recorder->release();
+
+					m_daemon->getEventManager()->fireEvent(&ev);
+					break;
+				}
+			}
+		}
+		else if(transfer->type == Transfer::TT_GENERIC)
+		{
+			long responseCode = 0;
+			char * effectiveUrl = 0;
+			Event ev = Event("download.result.failure");
+
+			if(transfer->opaque)
+				ev["opaque"] = transfer->opaque;
+
+			if(curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &effectiveUrl) == CURLE_OK && effectiveUrl)
+				ev["effective-url"] = string(effectiveUrl);
+			
+			if(curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &responseCode) == CURLE_OK && responseCode)
+				ev["code"] = responseCode;
+
+			ev["type"] = transfer->usertype;
+			ev["url"] = transfer->url;
+
+			m_daemon->getEventManager()->fireEvent(&ev);
+		}
+		else
+			transfer->recorder->release();
 
 		curl_multi_remove_handle(m_curlMulti, easy);
 		curl_easy_cleanup(easy);
+		delete transfer;
 	} while(messagesLeft);
+
+	if(!m_refcount && m_shuttingDown)
+		g_daemon->stop();
 }
 
-#if 0
-void DownloadCurlModule::transferFailed(TransferSession * socket)
-{
-	if(socket->getType() == socket->ST_GENERIC)
-	{
-		DEvent ev = Event("download.result.failure");
 
-		ev["type"] = socket->getTypeName();
-		ev["url"] = socket->getUrl();
-
-		m_daemon->getEventManager()->fireEvent(&ev);
-	}
-
-	m_daemon->getNetworkManager()->removeSocket(socket);
-	delete socket;
-	
-	if(!--m_refcount && m_shuttingDown)
-		m_daemon->stop();
-
-}
-
-void DownloadCurlModule::transferSucceeded(TransferSession * socket,
-	const string& response)
-{
-	switch(socket->getType())
-	{
-		case TransferSession::ST_SHELLCODE:
-		{
-			Event ev = Event("shellcode.file");
-
-			socket->getRecorder()->setProperty(("file:" + socket->getFilename()).c_str(), response);
-
-			ev["recorder"] = (void *) socket->getRecorder();
-			ev["name"] = socket->getFilename();
-			ev["url"] = socket->getUrl();
-
-			if(socket->getOpaque())
-				ev["opaque"] = socket->getOpaque();
-
-			m_daemon->getEventManager()->fireEvent(&ev);
-			break;
-		}
-
-		case TransferSession::ST_GENERIC:
-		{
-			Event ev = Event("download.result.success");
-
-			ev["type"] = socket->getTypeName();
-			ev["url"] = socket->getUrl();
-			ev["response"] = response;
-
-			if(socket->getOpaque())
-				ev["opaque"] = socket->getOpaque();
-
-			m_daemon->getEventManager()->fireEvent(&ev);
-			break;
-		}
-	}
-
-	m_daemon->getNetworkManager()->removeSocket(socket);
-	delete socket;
-
-	if(!--m_refcount && m_shuttingDown)
-		m_daemon->stop();
-
-}
-#endif
 
 EXPORT_LIBNETWORKD_MODULE(DownloadCurlModule, Daemon *);
 
