@@ -110,8 +110,9 @@ void DownloadCurlModule::handleEvent(Event * event)
 		curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 0L);
 		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_LIMIT, m_minimumSpeed);
 		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
-		curl_multi_add_handle(m_curlMulti, easy);
-		
+		curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
+
+		curl_multi_add_handle(m_curlMulti, easy);		
 		++m_refcount;
 	}
 	else if(* (* event) == "download.request")
@@ -130,6 +131,7 @@ void DownloadCurlModule::handleEvent(Event * event)
 		curl_easy_setopt(easy, CURLOPT_PRIVATE, transfer);
 		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_LIMIT, m_minimumSpeed);
 		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
+		curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
 
 		if(event->hasAttribute("ua"))
 			curl_easy_setopt(easy, CURLOPT_USERAGENT, (* (* event)["ua"]).c_str());
@@ -396,7 +398,11 @@ void DownloadCurlModule::checkFinished(int remaining)
 			m_daemon->getEventManager()->fireEvent(&ev);
 		}
 		else
+		{
+			LOG(L_SPAM, "Shellcode initiated transfer of %s for %p failed: %s",
+				transfer->url.c_str(), transfer->recorder, curl_easy_strerror(result));
 			transfer->recorder->release();
+		}
 
 		curl_multi_remove_handle(m_curlMulti, easy);
 		curl_easy_cleanup(easy);
