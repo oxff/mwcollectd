@@ -96,6 +96,8 @@ void DownloadCurlModule::handleEvent(Event * event)
 
 		curl_easy_setopt(easy, CURLOPT_URL, transfer->url.c_str());
 		curl_easy_setopt(easy, CURLOPT_PRIVATE, transfer);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_LIMIT, m_minimumSpeed);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
 
 		curl_multi_add_handle(m_curlMulti, easy);
 		++m_refcount;
@@ -113,6 +115,8 @@ void DownloadCurlModule::handleEvent(Event * event)
 		
 		curl_easy_setopt(easy, CURLOPT_URL, transfer->url.c_str());
 		curl_easy_setopt(easy, CURLOPT_PRIVATE, transfer);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_LIMIT, m_minimumSpeed);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
 
 		if(event->hasAttribute("ua"))
 			curl_easy_setopt(easy, CURLOPT_USERAGENT, (* (* event)["ua"]).c_str());
