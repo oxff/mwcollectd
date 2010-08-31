@@ -273,7 +273,7 @@ if test x$enable_curl = "xyes"; then
     CPPFLAGS+="$CPPFLAGS `curl-config --cflags`"
     LIBS+="$LIBS `curl-config --libs`"
     
-    AC_CHECK_LIB([curl], [curl_version],
+    AC_CHECK_LIB([curl], [curl_multi_socket_action],
              [AC_DEFINE(HAVE_LIBCURL, 1,
                        [Define if you want to use libcurl])
              LIB_CURL="`curl-config --libs` -lcurl"],

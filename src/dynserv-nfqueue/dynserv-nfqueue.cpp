@@ -58,6 +58,7 @@ bool DynamicServerNfqueue::start(Configuration * moduleConfiguration)
 
 	m_hitLimit = moduleConfiguration->getInteger(":rate-limit:hits", 0);
 	m_limitTimeout = moduleConfiguration->getInteger("rate-limit:timeout", 180);
+	m_rateLimitingTimeout = TIMEOUT_EMPTY;
 
 	if((m_netfilterHandle = nfq_open()) == 0)
 	{

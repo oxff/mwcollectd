@@ -59,25 +59,6 @@ private:
 	int m_fd;
 };
 
-struct Transfer
-{
-	enum TransferType
-	{
-		TT_GENERIC,
-		TT_SHELLCODE,
-	};
-
-	Transfer(TransferType t)
-		: type(t), opaque(0)
-	{ }
-
-	TransferType type;
-	string buffer;
-
-	string url;
-	void * opaque;
-};
-
 class DownloadCurlModule : public Module, public EventSubscriber, public TimeoutReceiver
 {
 public:
@@ -104,13 +85,39 @@ public:
 	{ return m_curlMulti; }
 
 protected:
+	struct Transfer
+	{
+		enum TransferType
+		{
+			TT_GENERIC,
+			TT_SHELLCODE,
+		};
+
+		Transfer(TransferType t)
+			: type(t), opaque(0)
+		{ }
+
+		TransferType type;
+		string buffer;
+
+		string url, usertype;
+
+		union
+		{
+			void * opaque;
+			StreamRecorder * recorder;
+		};
+	};
+
+
 	int socketCallback(CURL * easy, curl_socket_t s, int action, CurlSocket * socket);
 	static int curlSocketCallback(CURL * easy, curl_socket_t s, int action, DownloadCurlModule * module, CurlSocket * socket);
 	static int curlTimeoutCallback(CURLM * multi, long timeout, DownloadCurlModule * module);
+	static int curlWriteCallback(void * data, size_t block, size_t nblocks, Transfer * transfer);
 
 	void checkFinished(int remaining);
 	friend class CurlSocket;
-
+	
 private:
 	Daemon * m_daemon;
 
