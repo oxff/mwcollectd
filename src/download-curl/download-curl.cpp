@@ -117,8 +117,6 @@ void DownloadCurlModule::handleEvent(Event * event)
 	}
 	else if(* (* event) == "download.request")
 	{
-		++m_refcount;
-
 		Transfer * transfer = new Transfer(Transfer::TT_GENERIC);
 		transfer->url = * (* event)["url"];
 		transfer->usertype = * (* event)["type"];
@@ -155,7 +153,8 @@ void DownloadCurlModule::handleEvent(Event * event)
 				{
 					curl_formadd(&post, &lastpost, CURLFORM_COPYNAME, field.c_str(),
 						CURLFORM_COPYCONTENTS, (* (* event)["post:" + field]).data(),
-						CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + field]).size());
+						CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + field]).size(),
+						CURLFORM_END);
 				}
 				
 				fields.erase(0, delim + 1);
@@ -165,7 +164,8 @@ void DownloadCurlModule::handleEvent(Event * event)
 			{
 				curl_formadd(&post, &lastpost, CURLFORM_COPYNAME, fields.c_str(),
 					CURLFORM_COPYCONTENTS, (* (* event)["post:" + fields]).data(),
-					CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + fields]).size());
+					CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + fields]).size(),
+					CURLFORM_END);
 			}
 
 			if(post)
