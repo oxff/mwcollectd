@@ -47,6 +47,8 @@ DownloadCurlModule::DownloadCurlModule(Daemon * daemon)
 	curl_multi_setopt(m_curlMulti, CURLMOPT_SOCKETDATA, this);
 	curl_multi_setopt(m_curlMulti, CURLMOPT_TIMERFUNCTION, (curl_multi_timer_callback) curlTimeoutCallback);
 	curl_multi_setopt(m_curlMulti, CURLMOPT_TIMERDATA, this);
+
+	m_curlTimeout = TIMEOUT_EMPTY;
 }
 
 DownloadCurlModule::~DownloadCurlModule()
