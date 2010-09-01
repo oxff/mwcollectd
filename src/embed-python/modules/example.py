@@ -17,6 +17,18 @@ class SmbConnection(NetworkEndpoint):
 		log(L_SPAM, buf.decode('latin1').replace('\r\n', '').replace('\n', ''))
 
 
+class OutgoingConnection(NetworkEndpoint):
+	def connectionEstablished(self):
+		log(L_SPAM, "Outgoing connection has been established.")
+
+	def connectionClosed(self):
+		log(L_SPAM, "Outgoing connection has been closed.")
+
+	def dataRead(self, buf):
+		log(L_SPAM, "Echoed %u bytes on outgoing connection." % len(buf))
+		self.send(buf)
+
+
 class DebugEventHandler:
 	def __init__(self, name, event):
 		log(L_SPAM, '%s: %s' % (name, repr(event)))
@@ -40,6 +52,8 @@ def start(config):
 	process_handler = EventSubscription('shellcode.process', DebugEventHandler)
 	process_handler.register()
 
+	
+	connectStream( ('127.0.0.1', 1234), OutgoingConnection() )
 
 	return True
 
