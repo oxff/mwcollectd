@@ -277,7 +277,7 @@ if test x$enable_curl = "xyes"; then
 	AC_MSG_WARN([libcurl curl-config was not found in PATH])
     else
         CURL_INCLUDE+=" `curl-config --cflags`"
-   	CURL_LIB+="`curl-config --libs`"
+   	CURL_LIB+=" `curl-config --libs`"
     fi
 
     CPPFLAGS+=$CURL_INCLUDE
