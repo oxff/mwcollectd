@@ -74,6 +74,8 @@ AC_SUBST([PYTHON_LDFLAGS])
 do_enable_python="yes"
 
 AC_ARG_ENABLE(python, [  --enable-python    enable python support [[default yes]]], [do_enable_python=$enableval])
+AC_ARG_WITH(python3-config, [  --with-python3-config=PATH  specify path to python3-config binary],
+	    [export PYTHON3_CONFIG=$withval], [export PYTHON3_CONFIG=/usr/bin/python3-config])
 
 enable_python=${do_enable_python}
 
@@ -81,8 +83,8 @@ if test x"$enable_python" = "xyes"; then
 	if test -x "/usr/bin/python3-config"; then
 		ORIG_LDFLAGS=${LDFLAGS}
 		ORIG_CPPFLAGS=${CPPFLAGS}
-		PYTHON_LDFLAGS=" `/usr/bin/python3-config --ldflags` -L`/usr/bin/python3-config --prefix`/lib"
-		PYTHON_CPPFLAGS=" `/usr/bin/python3-config --includes`"
+		PYTHON_LDFLAGS=" `${PYTHON3_CONFIG} --ldflags` -L`${PYTHON3_CONFIG} --prefix`/lib"
+		PYTHON_CPPFLAGS=" `${PYTHON3_CONFIG} --includes`"
 		LDFLAGS+=${PYTHON_LDFLAGS}
 		CPPFLAGS+=${PYTHON_CPPFLAGS}
 
