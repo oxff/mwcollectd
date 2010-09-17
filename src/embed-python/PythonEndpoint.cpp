@@ -119,6 +119,7 @@ void PythonEndpoint::connectionEstablished(NetworkNode * remote, NetworkNode * l
 
 void PythonEndpoint::connectionClosed()
 {
+	if(m_recorder)
 	{
 		Event ev = Event("stream.finished");
 

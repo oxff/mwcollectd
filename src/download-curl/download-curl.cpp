@@ -47,6 +47,8 @@ DownloadCurlModule::DownloadCurlModule(Daemon * daemon)
 	curl_multi_setopt(m_curlMulti, CURLMOPT_SOCKETDATA, this);
 	curl_multi_setopt(m_curlMulti, CURLMOPT_TIMERFUNCTION, (curl_multi_timer_callback) curlTimeoutCallback);
 	curl_multi_setopt(m_curlMulti, CURLMOPT_TIMERDATA, this);
+
+	m_curlTimeout = TIMEOUT_EMPTY;
 }
 
 DownloadCurlModule::~DownloadCurlModule()
@@ -108,14 +110,15 @@ void DownloadCurlModule::handleEvent(Event * event)
 		curl_easy_setopt(easy, CURLOPT_PRIVATE, transfer);
 		curl_easy_setopt(easy, CURLOPT_FILETIME, 1L);
 		curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 0L);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_LIMIT, m_minimumSpeed);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
+		curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
 
-		curl_multi_add_handle(m_curlMulti, easy);
+		curl_multi_add_handle(m_curlMulti, easy);		
 		++m_refcount;
 	}
 	else if(* (* event) == "download.request")
 	{
-		++m_refcount;
-
 		Transfer * transfer = new Transfer(Transfer::TT_GENERIC);
 		transfer->url = * (* event)["url"];
 		transfer->usertype = * (* event)["type"];
@@ -126,6 +129,9 @@ void DownloadCurlModule::handleEvent(Event * event)
 		curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, curlWriteCallback);
 		curl_easy_setopt(easy, CURLOPT_WRITEDATA, transfer);
 		curl_easy_setopt(easy, CURLOPT_PRIVATE, transfer);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_LIMIT, m_minimumSpeed);
+		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
+		curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
 
 		if(event->hasAttribute("ua"))
 			curl_easy_setopt(easy, CURLOPT_USERAGENT, (* (* event)["ua"]).c_str());
@@ -149,7 +155,8 @@ void DownloadCurlModule::handleEvent(Event * event)
 				{
 					curl_formadd(&post, &lastpost, CURLFORM_COPYNAME, field.c_str(),
 						CURLFORM_COPYCONTENTS, (* (* event)["post:" + field]).data(),
-						CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + field]).size());
+						CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + field]).size(),
+						CURLFORM_END);
 				}
 				
 				fields.erase(0, delim + 1);
@@ -159,7 +166,8 @@ void DownloadCurlModule::handleEvent(Event * event)
 			{
 				curl_formadd(&post, &lastpost, CURLFORM_COPYNAME, fields.c_str(),
 					CURLFORM_COPYCONTENTS, (* (* event)["post:" + fields]).data(),
-					CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + fields]).size());
+					CURLFORM_CONTENTSLENGTH, (* (* event)["post:" + fields]).size(),
+					CURLFORM_END);
 			}
 
 			if(post)
@@ -392,7 +400,11 @@ void DownloadCurlModule::checkFinished(int remaining)
 			m_daemon->getEventManager()->fireEvent(&ev);
 		}
 		else
+		{
+			LOG(L_SPAM, "Shellcode initiated transfer of %s for %p failed: %s",
+				transfer->url.c_str(), transfer->recorder, curl_easy_strerror(result));
 			transfer->recorder->release();
+		}
 
 		curl_multi_remove_handle(m_curlMulti, easy);
 		curl_easy_cleanup(easy);
