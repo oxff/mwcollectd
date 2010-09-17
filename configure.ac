@@ -80,7 +80,7 @@ AC_ARG_WITH(python3-config, [  --with-python3-config=PATH  specify path to pytho
 enable_python=${do_enable_python}
 
 if test x"$enable_python" = "xyes"; then
-	if test -x "/usr/bin/python3-config"; then
+	if test -x "${PYTHON3_CONFIG}"; then
 		ORIG_LDFLAGS=${LDFLAGS}
 		ORIG_CPPFLAGS=${CPPFLAGS}
 		PYTHON_LDFLAGS=" `${PYTHON3_CONFIG} --ldflags` -L`${PYTHON3_CONFIG} --prefix`/lib"
