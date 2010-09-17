@@ -256,32 +256,39 @@ AC_ARG_WITH(curl-lib,
 if test x$enable_curl = "xyes"; then
     enable_curl="yes"
 
-    AC_PATH_PROG(LIBCURL_CONFIG, curl-config, no)
-    if test "$LIBCURL_CONFIG" = "no" ; then
-	AC_MSG_WARN([libcurl curl-config was not found in PATH])
-    fi
 
     orig_cppflags=$CPPFLAGS
     orig_libs=$LIBS
+
+    CURL_INCLUDE=""
+    CURL_LIB=""
     
     if test "x$curl_inc" != xno; then
-      CPPFLAGS="-I$curl_inc $CPPFLAGS"
+      CURL_INCLUDE+=" -I$curl_inc"
     fi
 
     if test "x$curl_lib" != "xno"; then
-        LDFLAGS="-L$curl_lib $LDFLAGS"
+        CURL_LIB+=" -L$curl_lib"
     fi
     
-    CPPFLAGS+="$CPPFLAGS `curl-config --cflags`"
-    LIBS+="$LIBS `curl-config --libs`"
+    AC_PATH_PROG(LIBCURL_CONFIG, curl-config, no)
+    if test "$LIBCURL_CONFIG" = "no" ; then
+	AC_MSG_WARN([libcurl curl-config was not found in PATH])
+        CURL_INCLUDE+=" `curl-config --cflags`"
+   	CURL_LIB+="`curl-config --libs`"
+    fi
+
+    CPPFLAGS+=$CURL_INCLUDE
+    LDFLAGS+=$CURL_LIB
     
     AC_CHECK_LIB([curl], [curl_multi_socket_action],
              [AC_DEFINE(HAVE_LIBCURL, 1,
                        [Define if you want to use libcurl])
-             LIB_CURL="`curl-config --libs` -lcurl"],
+             enable_libcurl="yes"
+	     AC_SUBST(CURL_INCLUDE)
+	     AC_SUBST(CURL_LIB)],
              [enable_libcurl="no"])
 
-    AC_SUBST(LIB_CURL)
 
     CPPFLAGS=$orig_cppflags
     LIBS=$orig_libs
