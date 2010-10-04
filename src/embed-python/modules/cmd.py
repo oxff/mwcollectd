@@ -84,6 +84,9 @@ class ShellcodeProcessHandler:
 					if word == '>':
 						self.vfiles[command[-1]] = line + '\n'
 					elif word == '>>':
+						if command[-1] not in self.vfiles:
+							self.vfiles[command[-1]] = ''
+
 						self.vfiles[command[-1]] += line + '\n'
 					else:
 						if line != '':
@@ -119,6 +122,13 @@ class ShellcodeProcessHandler:
 
 								url = 'ftp://%s:%s@%s:%i/%s' % (user, passwd, host, port, filename)
 								log(L_SPAM, 'FTP Download via shell: ' + url)
+
+								dispatchEvent('shellcode.download', {
+										'url': url,
+										'localfile': filename,
+										'recorder': recorder
+									})
+
 
 	def url_TFTP(self, command):
 		while len(command) > 0 and command[0][0] == '-':
