@@ -41,6 +41,7 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 	NetworkNode * localNode)
 {
 	NetworkNode remote = { remoteNode->name, localNode->port };
+	NetworkNode local = { localNode->name, 0 };
 
 	m_StreamRecorder = new StreamRecorder(remoteNode, localNode);
 
@@ -55,7 +56,7 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 	m_reverseTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(5, this);
 
 	if(!(m_reverseSocket = g_daemon->getNetworkManager()->connectStream(
-		&remote, &m_reverseEndpoint)))
+		&remote, &m_reverseEndpoint, &local)))
 	{
 		GLOG(L_INFO, "Could not reverse connection.");
 	}
