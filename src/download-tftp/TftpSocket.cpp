@@ -37,7 +37,10 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 
 TftpSocket::~TftpSocket()
@@ -52,8 +55,30 @@ bool TftpSocket::sendRequest()
 {
 	if(m_socket < 0)
 	{
+		struct sockaddr_in addrLocal;
+		const NetworkNode& localNode = m_recorder->getDestination();
+
 		if((m_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 			return false;
+
+		addrLocal.sin_family = AF_INET;
+		addrLocal.sin_port = 0;
+
+		if(inet_aton(localNode.name.c_str(), &addrLocal.sin_addr) == 0)
+		{
+			GLOG(L_CRIT, "%s.inet_aton(%s): %s", __PRETTY_FUNCTION__, localNode.name.c_str(), strerror(errno));
+
+			close(m_socket);
+			return false;
+		}
+
+		if(bind(m_socket, (struct sockaddr *) &addrLocal, sizeof(addrLocal)) < 0)
+		{
+			GLOG(L_CRIT, "%s.bind: %s", __PRETTY_FUNCTION__, strerror(errno));
+
+			close(m_socket);
+			return false;
+		}
 
 		if(fcntl(m_socket, F_SETFL, O_NONBLOCK) < 0)
 		{

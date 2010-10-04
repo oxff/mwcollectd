@@ -113,6 +113,7 @@ void DownloadCurlModule::handleEvent(Event * event)
 		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_LIMIT, m_minimumSpeed);
 		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
 		curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
+		curl_easy_setopt(easy, CURLOPT_INTERFACE, transfer->recorder->getDestination().name.c_str()); 
 
 		curl_multi_add_handle(m_curlMulti, easy);		
 		++m_refcount;
