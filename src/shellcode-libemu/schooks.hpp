@@ -47,12 +47,12 @@ uint32_t hook_URLDownloadToFile(struct emu_env *env, struct emu_env_hook *hook, 
 
 uint32_t hook_socket(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t hook_closesocket(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hookspecial_connect(struct emu_env *env, struct emu_env_hook *hook);
 uint32_t hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t hook_listen(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t hook_recv(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t hook_send(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t hookspecial_accept(struct emu_env *env, struct emu_env_hook *hook);
+uint32_t hookspecial_recv(struct emu_env *env, struct emu_env_hook *hook);
+uint32_t hookspecial_send(struct emu_env *env, struct emu_env_hook *hook);
 
 
 }

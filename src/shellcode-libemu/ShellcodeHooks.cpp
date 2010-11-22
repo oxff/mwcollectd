@@ -34,6 +34,21 @@ namespace schooks
 {
 
 
+#define HS_RETURN(retcode) do { \
+	emu_cpu_reg32_set(cpu, eax, retcode); \
+	return 0; \
+} while(0)
+
+static inline uint32_t _HS_ARG(struct emu_cpu * cpu, size_t idx)
+{
+	uint32_t tmp = 0;
+	emu_memory_read_dword(cpu->mem, cpu->reg[esp] + (idx + 1) * sizeof(uint32_t), &tmp);
+	return tmp;
+}
+
+#define HS_ARG(idx) _HS_ARG(cpu, idx)
+
+
 
 uint32_t hook_ExitProcess(struct emu_env *env, struct emu_env_hook *hook, ...)
 {
@@ -78,7 +93,6 @@ uint32_t hook_socket(struct emu_env *env, struct emu_env_hook *hook, ...)
 #endif
 
 	int socket = ((EmulatorSession *) hook->hook.win->userdata)->createSocket();
-
 	va_end(vl);
 	return (uint32_t) socket;
 }
@@ -99,35 +113,33 @@ uint32_t hook_closesocket(struct emu_env *env, struct emu_env_hook *hook, ...)
 	return ((EmulatorSession *) hook->hook.win->userdata)->destroySocket(fd);
 }
 
-uint32_t hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...)
+uint32_t hookspecial_connect(struct emu_env *env, struct emu_env_hook *hook)
 {
-	va_list vl;
-	va_start(vl, hook);
+	struct emu_cpu * cpu = emu_cpu_get(env->emu);
+	int fd = (int) HS_ARG(0);
+	struct sockaddr_in addr; // = HS_ARG(1);
+	uint32_t namelen = HS_ARG(2);
 
-	int fd = va_arg(vl, int);
-	struct sockaddr_in * addr = va_arg(vl, struct sockaddr_in *);
-	uint32_t namelen = va_arg(vl, uint32_t);
+	if(emu_memory_read_block(emu_memory_get(env->emu), HS_ARG(1), &addr, sizeof(addr)) < 0)
+		HS_RETURN( (uint32_t) -1 );
 
 	((EmulatorSession *) hook->hook.win->userdata)->resetStepCounter();
 
 	EmulatorSocket * socket = ((EmulatorSession *) hook->hook.win->userdata)->getSocket(fd);
 
 	if(!socket || namelen < 8)
-		return (uint32_t) -1;
+		HS_RETURN( (uint32_t) -1 );
 
-	int res = socket->connect(addr->sin_addr.s_addr, addr->sin_port);
+	int res = socket->connect(addr.sin_addr.s_addr, addr.sin_port);
 	// int res = socket->connect(0x0100007f, htons(4711));
 	
 	if(res == -2)
 	{
 		((EmulatorSession *) hook->hook.win->userdata)->yield();
-
-		va_end(vl);
 		return 0;
 	}
-
-	va_end(vl);
-	return res;
+	
+	HS_RETURN(res);
 }
 
 uint32_t hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...)
@@ -171,96 +183,83 @@ uint32_t hook_listen(struct emu_env *env, struct emu_env_hook *hook, ...)
 	return res;
 }
 
-uint32_t hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...)
+uint32_t hookspecial_accept(struct emu_env *env, struct emu_env_hook *hook)
 {
-	va_list vl;
-	va_start(vl, hook);
-
-	int fd = va_arg(vl, int);
-	uint32_t guestaddr = va_arg(vl, uint32_t);
-	uint32_t namelen = va_arg(vl, uint32_t);
+	struct emu_cpu * cpu = emu_cpu_get(env->emu);
+	int fd = (int) HS_ARG(0);
+	uint32_t guestaddr = HS_ARG(1);
+	uint32_t namelen = HS_ARG(2);
 
 	((EmulatorSession *) hook->hook.win->userdata)->resetStepCounter();
 
 	EmulatorSocket * socket = ((EmulatorSession *) hook->hook.win->userdata)->getSocket(fd);
 
 	if(!socket)
-		return (uint32_t) -1;
+		HS_RETURN( (uint32_t) -1);
 
 	int res = socket->accept(guestaddr, namelen);
 	
 	if(res == -2)
 	{
 		((EmulatorSession *) hook->hook.win->userdata)->yield();
-
-		va_end(vl);
 		return 0;
 	}
 
-	va_end(vl);
-	return res;
+	HS_RETURN(res);
 }
 
-uint32_t hook_recv(struct emu_env *env, struct emu_env_hook *hook, ...)
+uint32_t hookspecial_recv(struct emu_env *env, struct emu_env_hook *hook)
 {
-	va_list vl;
-	va_start(vl, hook);
-
-	int fd = va_arg(vl, int);
-	uint32_t buf = va_arg(vl, uint32_t);
-	uint32_t len =  va_arg(vl, uint32_t);
-	(void) va_arg(vl, int); // flags
+	struct emu_cpu * cpu = emu_cpu_get(env->emu);
+	int fd = (int) HS_ARG(0);
+	uint32_t buf = HS_ARG(1);
+	uint32_t len =  HS_ARG(2);
 
 	((EmulatorSession *) hook->hook.win->userdata)->resetStepCounter();
 
 	EmulatorSocket * socket = ((EmulatorSession *) hook->hook.win->userdata)->getSocket(fd);
 
 	if(!socket)
-		return (uint32_t) -1;
+		HS_RETURN( (uint32_t) -1 );
 
 	int res = socket->read(buf, len);
 
 	if(res == -2)
 	{
 		((EmulatorSession *) hook->hook.win->userdata)->yield();
-
-		va_end(vl);
 		return 0;
 	}
 
-	va_end(vl);
-	return (uint32_t) res;
+	HS_RETURN(res);
 }
 
 
-uint32_t hook_send(struct emu_env *env, struct emu_env_hook *hook, ...)
+uint32_t hookspecial_send(struct emu_env *env, struct emu_env_hook *hook)
 {
-	va_list vl;
-	va_start(vl, hook);
+	struct emu_cpu * cpu = emu_cpu_get(env->emu);
+	int fd = (int) HS_ARG(0);
+	uint32_t len = HS_ARG(2);
+	uint8_t buf[len];
 
-	int fd = va_arg(vl, int);
-	uint8_t * buf = va_arg(vl, uint8_t *);
-	uint32_t len = va_arg(vl, uint32_t);
+	if(!emu_memory_read_block(emu_memory_get(env->emu), HS_ARG(1), buf, len))
+		HS_RETURN( (uint32_t) -1 );
 
 	((EmulatorSession *) hook->hook.win->userdata)->resetStepCounter();
 
 	EmulatorSocket * socket = ((EmulatorSession *) hook->hook.win->userdata)->getSocket(fd);
 
 	if(!socket)
-		return (uint32_t) -1;
+		HS_RETURN( (uint32_t) -1 );
 
 	int res = socket->write(buf, len);
 
 	if(res == -2)
 	{
 		((EmulatorSession *) hook->hook.win->userdata)->yield();
-
-		va_end(vl);
 		return 0;
 	}
 
-	va_end(vl);
-	return (uint32_t) res;
+	HS_RETURN( (uint32_t) res );
 }
 
 

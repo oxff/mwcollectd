@@ -173,6 +173,7 @@ public:
 
 protected:
 	void registerHooks();
+	bool registerCustomHook(const char * exportName, uint32_t (* hook) (struct emu_env * env, struct emu_env_hook * hook));
 
 	int registerSocket(EmulatorSocket * socket);
 	void socketWakeup(int result);

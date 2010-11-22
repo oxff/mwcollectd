@@ -99,6 +99,50 @@ EmulatorSession::~EmulatorSession()
 		m_daemon->getTimeoutManager()->dropTimeout(m_Timeout);
 }
 
+int32_t emu_ll_w32_export_hook(struct emu_env *env, const char *exportname, int32_t (*llhook)(struct emu_env *env, struct emu_env_hook *hook), void *userdata)
+{
+	int numdlls=0;
+	while( env->env.win->loaded_dlls[numdlls] != NULL )
+	{
+		struct emu_hashtable_item *ehi = emu_hashtable_search(env->env.win->loaded_dlls[numdlls]->exports_by_fnname, (void *)exportname);
+		if( ehi != NULL )
+		{
+#if 0
+			printf("hooked %s\n",  exportname);
+#endif
+			struct emu_env_hook *hook = (struct emu_env_hook *)ehi->value;
+			hook->hook.win->fnhook = llhook;
+			hook->hook.win->userdata = userdata;
+			return 0;
+		}
+		numdlls++;
+	}
+#if 0
+	printf("hooking %s failed\n", exportname);
+#endif
+	return -1;
+}
+
+bool EmulatorSession::registerCustomHook(const char * exportName,
+	uint32_t (* hook) (struct emu_env * env, struct emu_env_hook * hook))
+{ // http://src.carnivore.it/dionaea/tree/modules/emu/emulate.c#n64
+	for(size_t k = 0; m_env->env.win->loaded_dlls[k]; ++k)
+	{
+		struct emu_hashtable_item * it;
+		
+		if(!(it = emu_hashtable_search(m_env->env.win->loaded_dlls[k]->exports_by_fnname, (char *) exportName)))
+			continue;
+
+		((struct emu_env_hook *) it->value)->hook.win->fnhook = (int32_t (*)
+			(struct emu_env *, struct emu_env_hook *)) hook;
+		((struct emu_env_hook *) it->value)->hook.win->userdata = this;
+
+		return true;
+	}
+
+	return false;
+}
+
 void EmulatorSession::registerHooks()
 {
 	emu_env_w32_export_hook(m_env, "CreateFileA", schooks::hook_CreateFile, this);
@@ -116,12 +160,13 @@ void EmulatorSession::registerHooks()
 	emu_env_w32_load_dll(m_env->env.win, (char *) "ws2_32.dll");
 	emu_env_w32_export_hook(m_env, "socket", schooks::hook_socket, this);
 	emu_env_w32_export_hook(m_env, "closesocket", schooks::hook_closesocket, this);
-	emu_env_w32_export_hook(m_env, "connect", schooks::hook_connect, this);
 	emu_env_w32_export_hook(m_env, "bind", schooks::hook_bind, this);
 	emu_env_w32_export_hook(m_env, "listen", schooks::hook_listen, this);
-	emu_env_w32_export_hook(m_env, "accept", schooks::hook_accept, this);
-	emu_env_w32_export_hook(m_env, "recv", schooks::hook_recv, this);
-	emu_env_w32_export_hook(m_env, "send", schooks::hook_send, this);
+
+	registerCustomHook("connect", schooks::hookspecial_connect);
+	registerCustomHook("accept", schooks::hookspecial_accept);
+	registerCustomHook("recv", schooks::hookspecial_recv);
+	registerCustomHook("send", schooks::hookspecial_send);
 }
 
 bool EmulatorSession::step()
