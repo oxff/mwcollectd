@@ -42,7 +42,8 @@ using namespace mwcollectd;
 	"	| '_ ` _ \\ \\ /\\ / / __/ _ \\| | |/ _ \\/ __| __/ _` |\n" \
 	"	| | | | | \\ V  V / (_| (_) | | |  __/ (__| || (_| |\n" \
 	"	|_| |_| |_|\\_/\\_/ \\___\\___/|_|_|\\___|\\___|\\__\\__,_|\n\n" \
-	"	Copyright 2009 Georg Wicherski, Kaspersky Labs GmbH <gw@mwcollect.org>\n" \
+	"	Copyright 2009-2010 Georg Wicherski, Kaspersky Labs GmbH <gw@mwcollect.org>\n" \
+	"	Copyright 2011 Georg Wicherski, McAfee GmbH <gw@mwcollect.org>\n" \
 	"	This program is licensed under the GNU Lesser General Public License.\n"
 
 
