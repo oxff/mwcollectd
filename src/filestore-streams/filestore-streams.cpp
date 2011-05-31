@@ -51,19 +51,19 @@ bool FileStoreStreamsModule::start(Configuration * moduleConfiguration)
 {
 	struct stat dir;
 
-	m_directory = PREFIX "/var/log/mwcollectd/attacks/";
+	m_filename = PREFIX "/var/log/mwcollectd/streams.log";
 
 	if(moduleConfiguration)
-		moduleConfiguration->getString(":directory", m_directory.c_str());
-
-	if(stat(m_directory.c_str(), &dir) < 0 || !(dir.st_mode & S_IFDIR))
 	{
-		LOG(L_CRIT, "\"%s\" does not exist or is not a directory!", m_directory.c_str());
-		return false;
+		m_filename = moduleConfiguration->getString(":logfile", m_filename.c_str());
+		m_incomingOnly = (bool) moduleConfiguration->getInteger(":incoming-only", 0);
 	}
 
-	if(* (-- m_directory.end()) != '/')
-		m_directory.append(1, '/');
+	if(stat(m_filename.c_str(), &dir) >= 0 && !(dir.st_mode & S_IFREG))
+	{
+		LOG(L_CRIT, "\"%s\" does exist and is not a regular file!", m_filename.c_str());
+		return false;
+	}
 
 	return m_daemon->getEventManager()->subscribeEventMask("stream.finished", this);
 }
@@ -79,17 +79,18 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 		for(StreamRecorder::Direction k = StreamRecorder::DIR_INCOMING;; k = StreamRecorder::DIR_OUTGOING)
 		{
 			recorder->acquireStreamData(k);
-			const basic_string<uint8_t>& incoming =
+			const basic_string<uint8_t>& data =
 				recorder->getStreamData(k);
-			stringstream filename;
+			stringstream prefix;
 
-			filename << m_directory << recorder->getSource().name << '-' << recorder->getSource().port
-				<< "_to_" << recorder->getDestination().name << '-' << recorder->getDestination().port
-				<< (k == StreamRecorder::DIR_INCOMING ? "_in" : "_out");
+			prefix << recorder->getSource().name << ':' << recorder->getSource().port
+				<< " -> " << recorder->getDestination().name << ':' << recorder->getDestination().port
+				<< (k == StreamRecorder::DIR_INCOMING ? " (in) -- " : " (out) -- ");
 
-			if((fd = open(filename.str().c_str(), O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
+			if((fd = open(m_filename.c_str(), O_CREAT | O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
 			{
-				LOG(L_CRIT, "Could not open %s for storing stream: %s", filename.str().c_str(), strerror(errno));
+				LOG(L_CRIT, "Could not open %s for storing stream `%s': %s", m_filename.c_str(),
+					prefix.str().c_str(), strerror(errno));
 				recorder->releaseStreamData(k);
 				return;
 			}
@@ -97,12 +98,24 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 			int ret;
 			basic_string<uint8_t>::size_type offset = 0;
 
-			while(offset < incoming.size() && (ret = write(fd, incoming.data() + offset, incoming.size() - offset)) > 0)
-				offset += ret;
-
-			if(offset < incoming.size())
 			{
-				LOG(L_CRIT, "Could not write all data to %s: %s", filename.str().c_str(), strerror(errno));
+				const string& prefix_str = prefix.str();
+
+				while(offset < prefix_str.size() && (ret = write(fd, prefix_str.data() + offset, prefix_str.size() - offset)) > 0)
+					offset += ret;
+
+				if(offset < prefix_str.size())
+					goto write_err;
+			}
+
+			if(writeBase64(fd, data.data(), data.size()) < data.size())
+				goto write_err;
+
+			if(write(fd, "\n", 1) < 1)
+			{
+			write_err:
+				LOG(L_CRIT, "Could not write all data of `%s' to %s: %s", prefix.str().c_str(),
+					m_filename.c_str(), strerror(errno));
 
 				recorder->releaseStreamData(k);
 				close(fd);
@@ -112,16 +125,52 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 			recorder->releaseStreamData(k);
 			close(fd);
 
-			if(k == StreamRecorder::DIR_OUTGOING)
-			{
+			if(m_incomingOnly || k == StreamRecorder::DIR_OUTGOING)
 				break;
-			}
 		}
-
-		LOG(L_INFO, "Saved stream from %s:%u to %s:%u to filesystem.", recorder->getSource().name.c_str(),
-			recorder->getSource().port, recorder->getDestination().name.c_str(), recorder->getDestination().port);
 	}
 }
+
+
+/* derived from http://base64.sourceforge.net/b64.c */
+static inline void _encode_b64_block(const uint8_t * in, char * out, size_t length)
+{
+	static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+	out[0] = alphabet[ in[0] >> 2 ];
+	out[1] = alphabet[ ((in[0] & 0x03) << 4) | ((in[1] & 0xf0) >> 4) ];
+	out[2] = (unsigned char) (length > 1 ? alphabet[ ((in[1] & 0x0f) << 2) | ((in[2] & 0xc0) >> 6) ] : '=');
+	out[3] = (unsigned char) (length > 2 ? alphabet[ in[2] & 0x3f ] : '=');
+}
+
+size_t FileStoreStreamsModule::writeBase64(int fd, const uint8_t * buffer, size_t bufferSize)
+{
+	char conversion[1024];
+	size_t i, j;
+
+	for(j = 0, i = 0; i < bufferSize; i += 3)
+	{
+		_encode_b64_block(&buffer[i], &conversion[j], bufferSize - i);
+		j += 4;
+
+		if(j == sizeof(conversion))
+		{
+			if(write(fd, conversion, j) < (int) j)
+				return i - (sizeof(conversion) / 4) * 3;
+
+			j = 0;
+		}
+	}
+
+	if(j > 0)
+	{
+		if(write(fd, conversion, j) < (int) j)
+				return i - (j / 4) * 3;
+	}
+
+	return i;
+}
+
 
 bool FileStoreStreamsModule::stop()
 {

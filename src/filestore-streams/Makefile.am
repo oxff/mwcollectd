@@ -14,4 +14,3 @@ filestore_streams_la_LDFLAGS = -module -no-undefined -avoid-version
 install-data-local:
 	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/log
 	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/log/mwcollectd
-	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/log/mwcollectd/attacks

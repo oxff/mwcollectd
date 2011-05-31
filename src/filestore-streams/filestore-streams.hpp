@@ -47,10 +47,14 @@ public:
 		"data in your local filesystem."; }
 	virtual void handleEvent(Event * event);
 
+protected:
+	size_t writeBase64(int fd, const uint8_t * buffer, size_t bufferSize);
+
 private:
 	Daemon * m_daemon;
 
-	string m_directory;
+	string m_filename;
+	bool m_incomingOnly;
 };
 
 
