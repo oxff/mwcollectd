@@ -7,6 +7,7 @@
  *
  *
  * 	Copyright 2009 Georg Wicherski, Kaspersky Labs GmbH
+ * 	Copyright 2011 Georg Wicherski, McAfee GmbH
  *
  *
  *	This file is part of mwcollectd.
