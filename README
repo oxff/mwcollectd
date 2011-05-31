@@ -18,11 +18,3 @@ from dionaea and licensed under the GPL License (see LICENSE file).
 This program implements ideas by Markus Koetter (esp. from Nepenthes and
 evtest) and Tillmann Werner (honeytrap). The main maintainer is Georg Wicherski
 <gw@mwcollect.org>.
-
-
-== Chanegelog ==
-
--- v4.0.0 --
-
-  + Rewrite from the scratch, nothing much common with its predecessors anymore.
-
