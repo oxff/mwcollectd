@@ -41,8 +41,10 @@ bool DynamicServerMirror::start(Configuration * moduleConfiguration)
 	if(!moduleConfiguration)
 		return false;
 
-	if(!setRanges(moduleConfiguration->getString(":mirror:port-range", "0-65535")))
+	if(!setRanges(moduleConfiguration->getString(":port-range", "0-65535")))
 		return false;
+
+	m_enableMirroring = (bool) moduleConfiguration->getInteger(":mirror", 1);
 
 	if(!m_daemon->getEventManager()->subscribeEventMask("stream.request", this))
 	{

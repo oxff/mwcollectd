@@ -45,7 +45,7 @@ MirrorServer::~MirrorServer()
 
 NetworkEndpoint * MirrorServer::createEndpoint(NetworkSocket * clientSocket)
 {
-	MirrorEndpoint * endpoint = new MirrorEndpoint(clientSocket);
+	MirrorEndpoint * endpoint = new MirrorEndpoint(clientSocket, m_parent->enableMirroring());
 	m_endpoints.push_back(endpoint);
 
 	g_daemon->getTimeoutManager()->dropTimeout(m_timeout);

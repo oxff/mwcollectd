@@ -47,8 +47,8 @@ using namespace std::tr1;
 class MirrorEndpoint : public NetworkEndpoint, public TimeoutReceiver
 {
 public:
-	MirrorEndpoint(NetworkSocket * socket)
-		: m_reverseEndpoint(this)
+	MirrorEndpoint(NetworkSocket * socket, bool enableMirror)
+		: m_reverseEndpoint(this), m_enableMirror(enableMirror)
 	{ m_socket = socket; m_StreamRecorder = 0; }
 
 	virtual ~MirrorEndpoint();
@@ -82,6 +82,8 @@ private:
 
 	Timeout m_idleTimeout, m_reverseTimeout, m_retardTimeout;
 	StreamRecorder * m_StreamRecorder;
+
+	bool m_enableMirror;
 };
 
 
@@ -131,6 +133,10 @@ public:
 
 	virtual void handleEvent(Event * event);
 
+	inline bool enableMirroring() const {
+		return m_enableMirroring;
+	}
+
 protected:
 	bool setRanges(const char * range);
 	bool mirrorPort(uint16_t port);
@@ -171,6 +177,8 @@ private:
 
 	typedef set<PortRange, PortRange> PortSet;
 	PortSet m_ports;
+
+	bool m_enableMirroring;
 };
 
 extern Daemon * g_daemon;

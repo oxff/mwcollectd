@@ -47,22 +47,26 @@ void MirrorEndpoint::connectionEstablished(NetworkNode * remoteNode,
 
 	m_idleTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(15, this);
 
-	if(remoteNode->name == "127.0.0.1")
-	{
+	if(!m_enableMirror || remoteNode->name == "127.0.0.1")
 		m_reverseSocket = 0;
-		return;
+	else {
+		m_reverseTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(5, this);
+
+		if(!(m_reverseSocket = g_daemon->getNetworkManager()->connectStream(
+			&remote, &m_reverseEndpoint, &local)))
+		{
+			GLOG(L_INFO, "Could not reverse connection.");
+		}
+		else
+			GLOG(L_SPAM, "Mirror connection to %s:%hu initiating...",
+				remoteNode->name.c_str(), localNode->port);
 	}
 
-	m_reverseTimeout = g_daemon->getTimeoutManager()->scheduleTimeout(5, this);
-
-	if(!(m_reverseSocket = g_daemon->getNetworkManager()->connectStream(
-		&remote, &m_reverseEndpoint, &local)))
+	if(!m_reverseSocket)
 	{
-		GLOG(L_INFO, "Could not reverse connection.");
+		m_retardTimeout = g_daemon->getTimeoutManager()
+			->scheduleTimeout(5, this);
 	}
-	else
-		GLOG(L_SPAM, "Mirror connection to %s:%hu initiating...",
-			remoteNode->name.c_str(), localNode->port);
 }
 
 void MirrorEndpoint::connectionClosed()
