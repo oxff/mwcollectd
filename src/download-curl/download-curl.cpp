@@ -69,6 +69,7 @@ bool DownloadCurlModule::start(Configuration * moduleConfiguration)
 	{
 		m_measurementInterval = 60;
 		m_minimumSpeed = 4096;
+		m_shellcodeUserAgent = "Mozilla/5.0 (Windows; U; MSIE 6.0; Windows NT 5.1)";
 
 		LOG(L_INFO, "No configuration for download-curl module, assuming default minimum speed of 4 KiB/s measured over 60s intervals.");
 	}
@@ -76,6 +77,7 @@ bool DownloadCurlModule::start(Configuration * moduleConfiguration)
 	{
 		m_measurementInterval = moduleConfiguration->getInteger(":measurement-interval", 60);
 		m_minimumSpeed = moduleConfiguration->getInteger(":minimum-speed", 4096);
+		m_shellcodeUserAgent = moduleConfiguration->getString(":shellcode-ua", "Mozilla/5.0 (Windows; U; MSIE 6.0; Windows NT 5.1)");
 	}
 
 	if(m_daemon->getEventManager()->subscribeEventMask("shellcode.download", this)
@@ -114,6 +116,7 @@ void DownloadCurlModule::handleEvent(Event * event)
 		curl_easy_setopt(easy, CURLOPT_LOW_SPEED_TIME, m_measurementInterval);
 		curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
 		curl_easy_setopt(easy, CURLOPT_INTERFACE, transfer->recorder->getDestination().name.c_str()); 
+		curl_easy_setopt(easy, CURLOPT_USERAGENT, m_shellcodeUserAgent.c_str());
 
 		curl_multi_add_handle(m_curlMulti, easy);		
 		++m_refcount;

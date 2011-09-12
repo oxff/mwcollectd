@@ -121,7 +121,7 @@ protected:
 private:
 	Daemon * m_daemon;
 
-	string m_directory;
+	string m_directory, m_shellcodeUserAgent;
 	size_t m_refcount;
 	bool m_shuttingDown;
 
