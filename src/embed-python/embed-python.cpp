@@ -346,7 +346,7 @@ string EmbedPythonModule::toString(PyObject * obj)
 
 	Py_ssize_t size = PyUnicode_GetSize(res);
 	wchar_t * str = (wchar_t *) malloc((size + 1) * sizeof(wchar_t));
-#if PY_VERSION_HEX >= 0x030200
+#if (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 2) || PY_MAJOR_VERSION > 3
 	PyUnicode_AsWideChar(res, str, size);
 #else
 	PyUnicode_AsWideChar((PyUnicodeObject *) res, str, size);
