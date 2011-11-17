@@ -95,6 +95,10 @@ if test x"$enable_python" = "xyes"; then
 
 			if test x"$enable_python" != "xyes"; then
 				AC_CHECK_LIB([python3.0], [Py_Initialize], [enable_python="yes"], [enable_python=""])
+			
+				if test x"$enable_python" != "xyes"; then
+					AC_CHECK_LIB([python3.2], [Py_Initialize], [enable_python="yes"], [enable_python=""])
+				fi
 			fi
 		fi
 

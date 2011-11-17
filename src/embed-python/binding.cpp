@@ -188,7 +188,7 @@ static PyObject * mwcollectd_NetworkEndpoint_close(PyObject *self, PyObject *arg
 
 static PyObject * mwcollectd_NetworkEndpoint_getRecorder(PyObject *self, PyObject *args)
 {
-	return PyCObject_FromVoidPtr(((mwcollectd_NetworkEndpoint *) self)->endpoint->getStreamRecorder(), 0);
+	return PyCapsule_New(((mwcollectd_NetworkEndpoint *) self)->endpoint->getStreamRecorder(), 0, 0);
 }
 
 
@@ -451,7 +451,7 @@ public:
 				}
 
 				case EVENT_AT_POINTER:
-					attr = PyCObject_FromVoidPtr(it->second.getPointerValue(), 0);
+					attr = PyCapsule_New(it->second.getPointerValue(), 0, 0);
 					break;
 			}
 			
@@ -855,9 +855,9 @@ static PyObject * mwcollectd_dispatchEvent(PyObject *self, PyObject *args)
 				if(overflow)
 					return 0;
 			}
-			else if(PyCObject_Check(value))
+			else if(PyCapsule_CheckExact(value))
 			{
-				ev[EmbedPythonModule::toString(key)] = PyCObject_AsVoidPtr(value);
+				ev[EmbedPythonModule::toString(key)] = PyCapsule_GetPointer(value, 0);
 			}
 			else
 			{
