@@ -6,6 +6,8 @@ AUTOMAKE_OPTIONS = foreign
 AM_CXXFLAGS = -Wall -Werror -Wno-deprecated -I../include/
 AM_LDFLAGS =
 
+sbin_SCRIPTS = mwcollectd-archive-streams.sh
+
 pkglib_LTLIBRARIES = filestore-streams.la
 
 filestore_streams_la_SOURCES = filestore-streams.cpp
