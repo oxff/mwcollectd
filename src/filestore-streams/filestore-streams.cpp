@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 #include <sstream>
 
 using namespace std;
@@ -52,7 +53,7 @@ bool FileStoreStreamsModule::start(Configuration * moduleConfiguration)
 {
 	struct stat dir;
 
-	m_filename = PREFIX "/var/log/mwcollectd/streams.log";
+	m_filename = PREFIX "/var/log/mwcollectd/streams-%HOUR%.log";
 
 	if(moduleConfiguration)
 	{
@@ -76,6 +77,25 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 		StreamRecorder * recorder = (StreamRecorder *)
 			(* event)["recorder"].getPointerValue();
 		int fd;
+		
+		static char dateBuffer[64];
+		string::size_type date;
+		struct tm localtime;
+		string filename = m_filename;
+		time_t now;
+
+		time(&now);
+
+		if((date = m_filename.find("%HOUR%")) != string::npos)
+		{
+			stringstream fn;
+
+			fn << m_filename.substr(0, date);
+			strftime(dateBuffer, sizeof(dateBuffer), "%Y%m%d-%H%z", ::localtime_r(&now, &localtime));
+			fn << dateBuffer << m_filename.substr(date + sizeof("%HOUR%") - 1);
+
+			filename = fn.str();
+		}
 
 		for(StreamRecorder::Direction k = StreamRecorder::DIR_INCOMING;; k = StreamRecorder::DIR_OUTGOING)
 		{
@@ -88,9 +108,10 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 				<< " -> " << recorder->getDestination().name << ':' << recorder->getDestination().port
 				<< (k == StreamRecorder::DIR_INCOMING ? " (in) -- " : " (out) -- ");
 
-			if((fd = open(m_filename.c_str(), O_CREAT | O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
+
+			if((fd = open(filename.c_str(), O_CREAT | O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
 			{
-				LOG(L_CRIT, "Could not open %s for storing stream `%s': %s", m_filename.c_str(),
+				LOG(L_CRIT, "Could not open %s for storing stream `%s': %s", filename.c_str(),
 					prefix.str().c_str(), strerror(errno));
 				recorder->releaseStreamData(k);
 				return;
