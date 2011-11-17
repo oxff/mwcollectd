@@ -243,7 +243,7 @@ CHECK_CRYPTO()
 dnl **************************************************
 dnl * libcurl Support                                *
 dnl **************************************************
-enable_curl="yes"
+do_enable_curl="yes"
 
 AC_ARG_ENABLE(curl, [  --enable-curl    enable http / ftp support via libcurl [[default yes]]], [do_enable_curl=$enableval])
 
@@ -258,10 +258,7 @@ AC_ARG_WITH(curl-lib,
     [curl_lib=no])
 
 
-if test x$enable_curl = "xyes"; then
-    enable_curl="yes"
-
-
+if test x$do_enable_curl = "xyes"; then
     orig_cppflags=$CPPFLAGS
     orig_libs=$LIBS
 
@@ -290,8 +287,8 @@ if test x$enable_curl = "xyes"; then
     AC_CHECK_LIB([curl], [curl_multi_socket_action],
              [AC_DEFINE(HAVE_LIBCURL, 1,
                        [Define if you want to use libcurl])
-             enable_libcurl="yes"]
-             [enable_libcurl="no"])
+             enable_curl="yes"]
+             [enable_curl=""])
 
     CPPFLAGS=$orig_cppflags
     LIBS=$orig_libs
