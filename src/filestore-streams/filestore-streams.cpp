@@ -104,15 +104,16 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 				recorder->getStreamData(k);
 			stringstream prefix;
 
-			prefix << recorder->getSource().name << ':' << recorder->getSource().port
-				<< " -> " << recorder->getDestination().name << ':' << recorder->getDestination().port
-				<< (k == StreamRecorder::DIR_INCOMING ? " (in) -- " : " (out) -- ");
-
+			prefix << "{\"source\":\"" << recorder->getSource().name << ':' << recorder->getSource().port
+				<< "\",\"destination\":\"" << recorder->getDestination().name << ':'
+				<< recorder->getDestination().port << "\",\"direction\":\""
+				<< (k == StreamRecorder::DIR_INCOMING ? "in" : "out")
+				<< "\",\"data\":\"";
 
 			if((fd = open(filename.c_str(), O_CREAT | O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
 			{
 				LOG(L_CRIT, "Could not open %s for storing stream `%s': %s", filename.c_str(),
-					prefix.str().c_str(), strerror(errno));
+					recorder->getSource().name.c_str(), strerror(errno));
 				recorder->releaseStreamData(k);
 				return;
 			}
@@ -133,10 +134,10 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 			if(writeBase64(fd, data.data(), data.size()) < data.size())
 				goto write_err;
 
-			if(write(fd, "\n", 1) < 1)
+			if(write(fd, "\"}\n", 3) < 3)
 			{
 			write_err:
-				LOG(L_CRIT, "Could not write all data of `%s' to %s: %s", prefix.str().c_str(),
+				LOG(L_CRIT, "Could not write all data of `%s' to %s: %s", recorder->getSource().name.c_str(),
 					m_filename.c_str(), strerror(errno));
 
 				recorder->releaseStreamData(k);
