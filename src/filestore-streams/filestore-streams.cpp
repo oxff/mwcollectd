@@ -103,11 +103,14 @@ void FileStoreStreamsModule::handleEvent(Event * event)
 			const basic_string<uint8_t>& data =
 				recorder->getStreamData(k);
 			stringstream prefix;
+			
+			strftime(dateBuffer, sizeof(dateBuffer), "%F %T %z", ::localtime_r(&now, &localtime));
 
 			prefix << "{\"source\":\"" << recorder->getSource().name << ':' << recorder->getSource().port
 				<< "\",\"destination\":\"" << recorder->getDestination().name << ':'
 				<< recorder->getDestination().port << "\",\"direction\":\""
 				<< (k == StreamRecorder::DIR_INCOMING ? "in" : "out")
+				<< "\",\"ts\":\"" << dateBuffer
 				<< "\",\"data\":\"";
 
 			if((fd = open(filename.c_str(), O_CREAT | O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP)) < 0)
