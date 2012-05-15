@@ -118,7 +118,7 @@ AC_SUBST([LIBEMU_LDFLAGS])
 
 AC_ARG_WITH(libemu,
     [  --with-libemu=PATH	specify path to libemu],
-    [export PKG_CONFIG_PATH=$withval/lib/pkgconfig],
+    [export PKG_CONFIG_PATH="${withval}/lib/pkgconfig"; export LIBEMU_DIR="${withval}"],
     [])
 
 do_enable_libemu="yes"
@@ -147,7 +147,23 @@ if test x"$enable_libemu" = "xyes"; then
 
 		echo linking against libemu `pkg-config --modversion libemu`
 	else
-		enable_libemu="no"
+		ORIG_LDFLAGS=${LDFLAGS}
+		ORIG_CPPFLAGS=${CPPFLAGS}
+		LIBEMU_LDFLAGS=" -L${LIBEMU_DIR}/lib -lemu"
+		LIBEMU_CPPFLAGS=" -I${LIBEMU_DIR}/include"
+		LDFLAGS+=${LIBEMU_LDFLAGS}
+		CPPFLAGS+=${LIBEMU_CPPFLAGS}
+
+		AC_CHECK_HEADER([emu/emu.h],[enable_libemu="yes"],[enable_libemu=""])
+
+		if test x"$enable_libemu" = "xyes"; then
+			AC_CHECK_LIB([emu],[emu_new],[enable_libemu="yes"],[enable_libemu=""])
+		fi
+
+		LDFLAGS=${ORIG_LDFLAGS}
+		CPPFLAGS=${ORIG_CPPFLAGS}
+
+		echo linking against libemu
 	fi
 fi
 
@@ -284,11 +300,12 @@ if test x$do_enable_curl = "xyes"; then
     CPPFLAGS+=$CURL_INCLUDE
     LDFLAGS+=$CURL_LIB
     
-    AC_CHECK_LIB([curl], [curl_multi_socket_action],
-             [AC_DEFINE(HAVE_LIBCURL, 1,
-                       [Define if you want to use libcurl])
-             enable_curl="yes"]
-             [enable_curl=""])
+    AC_CHECK_LIB([curl], [curl_multi_socket_action], [enable_curl="yes"], [enable_curl=""])
+
+    if test x$enable_curl = "xyes"; then
+        AC_DEFINE(HAVE_LIBCURL, 1,
+              [Define if you want to use libcurl])
+    fi
 
     CPPFLAGS=$orig_cppflags
     LIBS=$orig_libs
